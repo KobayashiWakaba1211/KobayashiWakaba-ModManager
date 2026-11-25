@@ -1,0 +1,885 @@
+{
+ "endfield": {
+  "characters": []
+ },
+ "starrail": {
+  "characters": [
+   {
+    "nameZh": "男主",
+    "nameEn": "Caelus",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:hsr-outfit-229001-m",
+      "nameZh": "龙马精神",
+      "nameEn": "Vim and Vigor",
+      "image": "/qaqm-skins/honkai-star-rail/images/男主/hsr-outfit-229001-m.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "遐蝶",
+    "nameEn": "Castorice",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:hsr-outfit-1140701",
+      "nameZh": "幽梦翩跹",
+      "nameEn": "Gossamer Flutter",
+      "image": "/qaqm-skins/honkai-star-rail/images/遐蝶/hsr-outfit-1140701.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "流萤",
+    "nameEn": "Firefly",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:hsr-outfit-1131001",
+      "nameZh": "春日手信",
+      "nameEn": "Spring Missive",
+      "image": "/qaqm-skins/honkai-star-rail/images/流萤/hsr-outfit-1131001.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "三月七-存护",
+    "nameEn": "March 7th",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:hsr-outfit-1100101",
+      "nameZh": "冬去煦至",
+      "nameEn": "Nascent Spring",
+      "image": "/qaqm-skins/honkai-star-rail/images/三月七-存护/hsr-outfit-1100101.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "阮梅",
+    "nameEn": "Ruan Mei",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:hsr-outfit-1130301",
+      "nameZh": "雪绽梅笺",
+      "nameEn": "Plumblossom Letter",
+      "image": "/qaqm-skins/honkai-star-rail/images/阮梅/hsr-outfit-1130301.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "女主",
+    "nameEn": "Stelle",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:hsr-outfit-229001-f",
+      "nameZh": "龙马精神",
+      "nameEn": "Vim and Vigor",
+      "image": "/qaqm-skins/honkai-star-rail/images/女主/hsr-outfit-229001-f.webp"
+     }
+    ]
+   }
+  ]
+ },
+ "neverness": {
+  "characters": [
+   {
+    "nameZh": "九原",
+    "nameEn": "Jiuyuan",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1055-nighty",
+      "nameZh": "自律时间",
+      "nameEn": "Self-Discipline Time",
+      "image": "/qaqm-skins/neverness-to-everness/images/九原/nte-outfit-1055-nighty.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "伊洛伊",
+    "nameEn": "Iroi",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1075-rpg-level1",
+      "nameZh": "术法吟唱中",
+      "nameEn": "Channeling…",
+      "image": "/qaqm-skins/neverness-to-everness/images/伊洛伊/nte-outfit-1075-rpg-level1.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1075-rpg-level2",
+      "nameZh": "大魔导师",
+      "nameEn": "Archmage",
+      "image": "/qaqm-skins/neverness-to-everness/images/伊洛伊/nte-outfit-1075-rpg-level2.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1075-rpg-level3",
+      "nameZh": "织梦者",
+      "nameEn": "Dreamweaver",
+      "image": "/qaqm-skins/neverness-to-everness/images/伊洛伊/nte-outfit-1075-rpg-level3.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "女主",
+    "nameEn": "Zero (Female)",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1051-2",
+      "nameZh": "猎人不上班",
+      "nameEn": "Hunter Off Duty",
+      "image": "/qaqm-skins/neverness-to-everness/images/女主/nte-outfit-1051-2.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1051-3",
+      "nameZh": "城市漫游者",
+      "nameEn": "City Wanderer",
+      "image": "/qaqm-skins/neverness-to-everness/images/女主/nte-outfit-1051-3.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1051-4",
+      "nameZh": "「非常规衣着」",
+      "nameEn": "Unconventional Attire",
+      "image": "/qaqm-skins/neverness-to-everness/images/女主/nte-outfit-1051-4.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1051-5",
+      "nameZh": "学园随想",
+      "nameEn": "School Musings",
+      "image": "/qaqm-skins/neverness-to-everness/images/女主/nte-outfit-1051-5.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1051-6",
+      "nameZh": "涂鸦进行时",
+      "nameEn": "Graffiti in Progress",
+      "image": "/qaqm-skins/neverness-to-everness/images/女主/nte-outfit-1051-6.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1051-7",
+      "nameZh": "最佳拍档",
+      "nameEn": "Perfect Partners",
+      "image": "/qaqm-skins/neverness-to-everness/images/女主/nte-outfit-1051-7.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1051-rpg-level1",
+      "nameZh": "未启之锋",
+      "nameEn": "Unassuming Warrior",
+      "image": "/qaqm-skins/neverness-to-everness/images/女主/nte-outfit-1051-rpg-level1.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1051-rpg-level2",
+      "nameZh": "剑士之姿",
+      "nameEn": "The Blademaster",
+      "image": "/qaqm-skins/neverness-to-everness/images/女主/nte-outfit-1051-rpg-level2.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1051-rpg-level3",
+      "nameZh": "授勋日",
+      "nameEn": "Glory Days",
+      "image": "/qaqm-skins/neverness-to-everness/images/女主/nte-outfit-1051-rpg-level3.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "娜娜莉",
+    "nameEn": "Nanally",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1010-1",
+      "nameZh": "反转童话",
+      "nameEn": "Reverse Fairy Tale",
+      "image": "/qaqm-skins/neverness-to-everness/images/娜娜莉/nte-outfit-1010-1.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1010-2",
+      "nameZh": "华丽飞踢",
+      "nameEn": "Phoenix Kick",
+      "image": "/qaqm-skins/neverness-to-everness/images/娜娜莉/nte-outfit-1010-2.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1010-3",
+      "nameZh": "学园之星",
+      "nameEn": "The Popular Kid",
+      "image": "/qaqm-skins/neverness-to-everness/images/娜娜莉/nte-outfit-1010-3.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1010-nighty",
+      "nameZh": "绵绵飞虎",
+      "nameEn": "Fluffy Flying Tiger",
+      "image": "/qaqm-skins/neverness-to-everness/images/娜娜莉/nte-outfit-1010-nighty.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "安魂曲",
+    "nameEn": "Requiem",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1004-1",
+      "nameZh": "鎏金交响诗",
+      "nameEn": "Gilded Rhapsody",
+      "image": "/qaqm-skins/neverness-to-everness/images/安魂曲/nte-outfit-1004-1.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1004-2",
+      "nameZh": "旧忆挽歌",
+      "nameEn": "Yesterday's Melody",
+      "image": "/qaqm-skins/neverness-to-everness/images/安魂曲/nte-outfit-1004-2.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1004-3",
+      "nameZh": "黑白童谣",
+      "nameEn": "Piano Key Sonatina",
+      "image": "/qaqm-skins/neverness-to-everness/images/安魂曲/nte-outfit-1004-3.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1004-4",
+      "nameZh": "千里莺啼",
+      "nameEn": "Nightingale's Crescendo",
+      "image": "/qaqm-skins/neverness-to-everness/images/安魂曲/nte-outfit-1004-4.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1004-nighty",
+      "nameZh": "新月摇篮曲",
+      "nameEn": "New Moon Lullaby",
+      "image": "/qaqm-skins/neverness-to-everness/images/安魂曲/nte-outfit-1004-nighty.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "小吱",
+    "nameEn": "Xiaozhi",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1073-1",
+      "nameZh": "青竹猗猗",
+      "nameEn": "Verdant Grace",
+      "image": "/qaqm-skins/neverness-to-everness/images/小吱/nte-outfit-1073-1.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1073-nighty",
+      "nameZh": "绒绒春日",
+      "nameEn": "Velvet Spring Day",
+      "image": "/qaqm-skins/neverness-to-everness/images/小吱/nte-outfit-1073-nighty.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "早雾",
+    "nameEn": "Sayuri",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1003-1",
+      "nameZh": "南瓜魔法",
+      "nameEn": "Pumpkin Magic",
+      "image": "/qaqm-skins/neverness-to-everness/images/早雾/nte-outfit-1003-1.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "真红",
+    "nameEn": "Shinku",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1076-1",
+      "nameZh": "地海高校生",
+      "nameEn": "Student of Terrasea",
+      "image": "/qaqm-skins/neverness-to-everness/images/真红/nte-outfit-1076-1.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1076-2",
+      "nameZh": "猎龙者",
+      "nameEn": "Dragonhunter",
+      "image": "/qaqm-skins/neverness-to-everness/images/真红/nte-outfit-1076-2.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1076-3",
+      "nameZh": "黎明破浪者",
+      "nameEn": "Dawn Patrol",
+      "image": "/qaqm-skins/neverness-to-everness/images/真红/nte-outfit-1076-3.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1076-nighty",
+      "nameZh": "迷宫屋主",
+      "nameEn": "Labyrinth Lily",
+      "image": "/qaqm-skins/neverness-to-everness/images/真红/nte-outfit-1076-nighty.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1076-rpg-level1",
+      "nameZh": "一般过路人",
+      "nameEn": "Normie Heroine",
+      "image": "/qaqm-skins/neverness-to-everness/images/真红/nte-outfit-1076-rpg-level1.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "法蒂亚",
+    "nameEn": "Fadia",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1039-nighty",
+      "nameZh": "夜色秘辛",
+      "nameEn": "Tales of the Night",
+      "image": "/qaqm-skins/neverness-to-everness/images/法蒂亚/nte-outfit-1039-nighty.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "浔",
+    "nameEn": "Xun",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1052-1",
+      "nameZh": "兰花不菲",
+      "nameEn": "Priceless Orchid",
+      "image": "/qaqm-skins/neverness-to-everness/images/浔/nte-outfit-1052-1.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1052-nighty",
+      "nameZh": "闲满庭",
+      "nameEn": "Recreational Courtyard",
+      "image": "/qaqm-skins/neverness-to-everness/images/浔/nte-outfit-1052-nighty.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "男主",
+    "nameEn": "Zero (Male)",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1046-2",
+      "nameZh": "猎人不上班",
+      "nameEn": "Hunter Off Duty",
+      "image": "/qaqm-skins/neverness-to-everness/images/男主/nte-outfit-1046-2.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1046-3",
+      "nameZh": "城市漫游者",
+      "nameEn": "City Wanderer",
+      "image": "/qaqm-skins/neverness-to-everness/images/男主/nte-outfit-1046-3.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1046-4",
+      "nameZh": "「非常规衣着」",
+      "nameEn": "Unconventional Attire",
+      "image": "/qaqm-skins/neverness-to-everness/images/男主/nte-outfit-1046-4.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1046-5",
+      "nameZh": "学园随想",
+      "nameEn": "School Musings",
+      "image": "/qaqm-skins/neverness-to-everness/images/男主/nte-outfit-1046-5.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1046-6",
+      "nameZh": "涂鸦进行时",
+      "nameEn": "Graffiti in Progress",
+      "image": "/qaqm-skins/neverness-to-everness/images/男主/nte-outfit-1046-6.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1046-7",
+      "nameZh": "最佳拍档",
+      "nameEn": "Perfect Partners",
+      "image": "/qaqm-skins/neverness-to-everness/images/男主/nte-outfit-1046-7.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1046-rpg-level1",
+      "nameZh": "未启之锋",
+      "nameEn": "Unassuming Warrior",
+      "image": "/qaqm-skins/neverness-to-everness/images/男主/nte-outfit-1046-rpg-level1.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1046-rpg-level2",
+      "nameZh": "剑士之姿",
+      "nameEn": "The Blademaster",
+      "image": "/qaqm-skins/neverness-to-everness/images/男主/nte-outfit-1046-rpg-level2.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1046-rpg-level3",
+      "nameZh": "授勋日",
+      "nameEn": "Glory Days",
+      "image": "/qaqm-skins/neverness-to-everness/images/男主/nte-outfit-1046-rpg-level3.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "薄荷",
+    "nameEn": "Mint",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1019-1",
+      "nameZh": "致玛丽",
+      "nameEn": "To Mary",
+      "image": "/qaqm-skins/neverness-to-everness/images/薄荷/nte-outfit-1019-1.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1019-nighty",
+      "nameZh": "悠闲假日",
+      "nameEn": "Leisurely Holiday",
+      "image": "/qaqm-skins/neverness-to-everness/images/薄荷/nte-outfit-1019-nighty.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1019-rpg-level1",
+      "nameZh": "自由如风",
+      "nameEn": "Wild as the Wind",
+      "image": "/qaqm-skins/neverness-to-everness/images/薄荷/nte-outfit-1019-rpg-level1.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1019-rpg-level2",
+      "nameZh": "林野猎手",
+      "nameEn": "Sylvan Hunter",
+      "image": "/qaqm-skins/neverness-to-everness/images/薄荷/nte-outfit-1019-rpg-level2.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1019-rpg-level3",
+      "nameZh": "幽火照影",
+      "nameEn": "Aurora Flame",
+      "image": "/qaqm-skins/neverness-to-everness/images/薄荷/nte-outfit-1019-rpg-level3.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "达芙迪尔",
+    "nameEn": "Daffodil",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1054-1",
+      "nameZh": "都市浮光",
+      "nameEn": "City Glimmer",
+      "image": "/qaqm-skins/neverness-to-everness/images/达芙迪尔/nte-outfit-1054-1.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "卡厄斯",
+    "nameEn": "Chaos",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:nte-fashion-1071-1",
+      "nameZh": "放晴日",
+      "nameEn": "Clear Skies",
+      "image": "/qaqm-skins/neverness-to-everness/images/卡厄斯/nte-outfit-1071-1.webp"
+     },
+     {
+      "sectionId": "skin:nte-fashion-1071-nighty",
+      "nameZh": "保持锻炼",
+      "nameEn": "Never Skip",
+      "image": "/qaqm-skins/neverness-to-everness/images/卡厄斯/nte-outfit-1071-nighty.webp"
+     }
+    ]
+   }
+  ]
+ },
+ "wuthering": {
+  "characters": [
+   {
+    "nameZh": "男主",
+    "nameEn": "Rover (Male)",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:wuwa-outfit-perpetual-spark-male",
+      "nameZh": "星火永明",
+      "nameEn": "Perpetual Spark",
+      "image": "/qaqm-skins/wuwa/images/男主/wuwa-outfit-perpetual-spark-male.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "女主",
+    "nameEn": "Rover (Female)",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:wuwa-outfit-perpetual-spark-female",
+      "nameZh": "星火永明",
+      "nameEn": "Perpetual Spark",
+      "image": "/qaqm-skins/wuwa/images/女主/wuwa-outfit-perpetual-spark-female.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "珂莱塔",
+    "nameEn": "Carlotta",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:wuwa-outfit-splashing-summer",
+      "nameZh": "夏日旖旎",
+      "nameEn": "Splashing Summer",
+      "image": "/qaqm-skins/wuwa/images/珂莱塔/wuwa-outfit-splashing-summer.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "长离",
+    "nameEn": "Changli",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:wuwa-outfit-laurel-nymph",
+      "nameZh": "桂枝宁芙",
+      "nameEn": "Laurel Nymph",
+      "image": "/qaqm-skins/wuwa/images/长离/wuwa-outfit-laurel-nymph.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "千咲",
+    "nameEn": "Chisa",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:wuwa-outfit-peach-parfait",
+      "nameZh": "蜜桃冰",
+      "nameEn": "Peach Parfait",
+      "image": "/qaqm-skins/wuwa/images/千咲/wuwa-outfit-peach-parfait.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "今汐",
+    "nameEn": "Jinhsi",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:wuwa-outfit-peach-blossom",
+      "nameZh": "桃夭灼灼",
+      "nameEn": "Peach Blossom",
+      "image": "/qaqm-skins/wuwa/images/今汐/wuwa-outfit-peach-blossom.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "琳奈",
+    "nameEn": "Lynae",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:wuwa-outfit-peppermint",
+      "nameZh": "薄荷糖",
+      "nameEn": "Peppermint",
+      "image": "/qaqm-skins/wuwa/images/琳奈/wuwa-outfit-peppermint.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "莫宁",
+    "nameEn": "Mornye",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:wuwa-outfit-plush-dream",
+      "nameZh": "呢绒梦",
+      "nameEn": "Plush Dream",
+      "image": "/qaqm-skins/wuwa/images/莫宁/wuwa-outfit-plush-dream.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "散华",
+    "nameEn": "Sanhua",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:wuwa-outfit-exorcistic-adjuration",
+      "nameZh": "叱妖诰",
+      "nameEn": "Exorcistic Adjuration",
+      "image": "/qaqm-skins/wuwa/images/散华/wuwa-outfit-exorcistic-adjuration.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "赞妮",
+    "nameEn": "Zani",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:wuwa-outfit-downtown-repose",
+      "nameZh": "城市午茶",
+      "nameEn": "Downtown Repose",
+      "image": "/qaqm-skins/wuwa/images/赞妮/wuwa-outfit-downtown-repose.webp"
+     }
+    ]
+   }
+  ]
+ },
+ "zenless": {
+  "characters": [
+   {
+    "nameZh": "男主",
+    "nameEn": "Wise",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-4120112",
+      "nameZh": "浪影闲庭",
+      "nameEn": "Peaceful Waves",
+      "image": "/qaqm-skins/zzz/images/男主/zzz-outfit-4120112.webp"
+     },
+     {
+      "sectionId": "skin:zzz-outfit-oath-of-skies",
+      "nameZh": "苍穹执誓",
+      "nameEn": "Oath of Skies",
+      "image": "/qaqm-skins/zzz/images/男主/zzz-outfit-oath-of-skies.webp"
+     },
+     {
+      "sectionId": "skin:zzz-outfit-4120111",
+      "nameZh": "鹤唳青霄",
+      "nameEn": "Soaring Crane",
+      "image": "/qaqm-skins/zzz/images/男主/zzz-outfit-4120111.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "女主",
+    "nameEn": "Belle",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-4120012",
+      "nameZh": "夏日晴空",
+      "nameEn": "Summer Skies",
+      "image": "/qaqm-skins/zzz/images/女主/zzz-outfit-4120012.webp"
+     },
+     {
+      "sectionId": "skin:zzz-outfit-4120011",
+      "nameZh": "曦色玲珑",
+      "nameEn": "Delicate Sunlight",
+      "image": "/qaqm-skins/zzz/images/女主/zzz-outfit-4120011.webp"
+     },
+     {
+      "sectionId": "skin:zzz-outfit-brilliance-of-stars",
+      "nameZh": "极星澄明",
+      "nameEn": "Brilliance of Stars",
+      "image": "/qaqm-skins/zzz/images/女主/zzz-outfit-brilliance-of-stars.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "妮可",
+    "nameEn": "Nicole Demara",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3110311",
+      "nameZh": "狡黠甜心",
+      "nameEn": "Cunning Cutie",
+      "image": "/qaqm-skins/zzz/images/妮可/zzz-outfit-3110311.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "艾莲",
+    "nameEn": "Ellen Joe",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3111911",
+      "nameZh": "从周一到周五",
+      "nameEn": "On Campus",
+      "image": "/qaqm-skins/zzz/images/艾莲/zzz-outfit-3111911.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "简",
+    "nameEn": "Jane Doe",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3112611",
+      "nameZh": "漪光夜曲",
+      "nameEn": "Nocturne of Light",
+      "image": "/qaqm-skins/zzz/images/简/zzz-outfit-3112611.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "耀嘉音",
+    "nameEn": "Astra Yao",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3113111",
+      "nameZh": "水晶灯下",
+      "nameEn": "Chandelier",
+      "image": "/qaqm-skins/zzz/images/耀嘉音/zzz-outfit-3113111.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "雅",
+    "nameEn": "Hoshimi Miyabi",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3110911",
+      "nameZh": "银庭花信",
+      "nameEn": "Dignified Blossom",
+      "image": "/qaqm-skins/zzz/images/雅/zzz-outfit-3110911.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "仪玄",
+    "nameEn": "Yixuan",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3113711",
+      "nameZh": "墨形影踪",
+      "nameEn": "Trails of Ink",
+      "image": "/qaqm-skins/zzz/images/仪玄/zzz-outfit-3113711.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "薇薇安",
+    "nameEn": "Vivian Banshee",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3113311",
+      "nameZh": "鸢花池畔",
+      "nameEn": "Iris of the Shore",
+      "image": "/qaqm-skins/zzz/images/薇薇安/zzz-outfit-3113311.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "柚叶",
+    "nameEn": "Ukinami Yuzuha",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3114111",
+      "nameZh": "晴空化狸",
+      "nameEn": "Tanuki in Broad Daylight",
+      "image": "/qaqm-skins/zzz/images/柚叶/zzz-outfit-3114111.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "爱丽丝",
+    "nameEn": "Alice Thymefield",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3114011",
+      "nameZh": "百里香之海",
+      "nameEn": "Sea of Thyme",
+      "image": "/qaqm-skins/zzz/images/爱丽丝/zzz-outfit-3114011.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "潘引壶",
+    "nameEn": "Pan Yinhu",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3114211",
+      "nameZh": "馔玉烹金",
+      "nameEn": "Culinary Jewel",
+      "image": "/qaqm-skins/zzz/images/潘引壶/zzz-outfit-3114211.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "真斗",
+    "nameEn": "Komano Manato",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3114411",
+      "nameZh": "白心旧影",
+      "nameEn": "White Heart Silhouette",
+      "image": "/qaqm-skins/zzz/images/真斗/zzz-outfit-3114411.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "叶瞬光",
+    "nameEn": "Ye Shunguang",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3114311",
+      "nameZh": "暖霞拾光",
+      "nameEn": "Touch of Dawnlight",
+      "image": "/qaqm-skins/zzz/images/叶瞬光/zzz-outfit-3114311.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "爱芮",
+    "nameEn": "Aria",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3115011",
+      "nameZh": "不协和音",
+      "nameEn": "Discordant Note",
+      "image": "/qaqm-skins/zzz/images/爱芮/zzz-outfit-3115011.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "千夏",
+    "nameEn": "Sunna",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3114911",
+      "nameZh": "午后茶歇",
+      "nameEn": "Afternoon Tea Break",
+      "image": "/qaqm-skins/zzz/images/千夏/zzz-outfit-3114911.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "南宫羽",
+    "nameEn": "Nangong Yu",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3115111",
+      "nameZh": "狂想缪斯",
+      "nameEn": "Rhapsody's Muse",
+      "image": "/qaqm-skins/zzz/images/南宫羽/zzz-outfit-3115111.webp"
+     }
+    ]
+   },
+   {
+    "nameZh": "维琳娜",
+    "nameEn": "Velina",
+    "aliases": [],
+    "skins": [
+     {
+      "sectionId": "skin:zzz-outfit-3115611",
+      "nameZh": "暇时闲影",
+      "nameEn": "Shade of Leisure",
+      "image": "/qaqm-skins/zzz/images/维琳娜/zzz-outfit-3115611.webp"
+     }
+    ]
+   }
+  ]
+ }
+}

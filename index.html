@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QAQM - Mod 管理器</title>
+    <script>
+      // 全局错误兜底：即使 React 崩溃也能看到错误内容
+      (function () {
+        var failed = [];
+        function show(title, detail) {
+          var root = document.getElementById("root");
+          if (!root) return;
+          var box = document.getElementById("__err_box");
+          if (!box) {
+            box = document.createElement("pre");
+            box.id = "__err_box";
+            // 右下角小面板：既能看错误，又不会挡住整个界面（曾经全屏 inset:0 吃掉所有点击）
+            box.style.cssText =
+              "position:fixed;right:12px;bottom:12px;z-index:99999;margin:0;padding:14px 16px;" +
+              "max-width:60vw;max-height:40vh;overflow:auto;border-radius:10px;" +
+              "border:1px solid rgba(255,143,163,0.35);box-shadow:0 10px 30px rgba(0,0,0,0.5);" +
+              "background:#12121a;color:#ff8fa3;font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;";
+            document.body.appendChild(box);
+          }
+          box.textContent += "[" + title + "]\n" + detail + "\n\n";
+        }
+        window.addEventListener("error", function (e) {
+          var t = e.target;
+          if (t && (t.tagName === "SCRIPT" || t.tagName === "LINK" || t.tagName === "IMG")) {
+            // 单个资源失败（封面图损坏等）不是致命错误，只记录到控制台
+            var url = t.src || t.href || "(unknown)";
+            failed.push(t.tagName + " " + url);
+            if (window.console) console.warn("[资源加载失败]", t.tagName, url);
+            return;
+          } else {
+            show(
+              "运行时错误",
+              (e.message || "(无 message)") +
+                "\n" +
+                ((e.error && e.error.stack) || "(无 stack)") +
+                "\n target: " + (t && t.tagName ? t.tagName + " " + (t.src || t.href || "") : "(none)")
+            );
+          }
+        }, true);
+        window.addEventListener("unhandledrejection", function (e) {
+          var r = e.reason;
+          show("未处理的 Promise 异常", (r && (r.stack || r.message)) || String(r));
+        });
+        // 诊断：3 秒后检查 root 内容（无论挂载标志如何）
+        window.__diag_timer = setTimeout(function () {
+          var root = document.getElementById("root");
+          var len = root ? root.innerHTML.length : -1;
+          if (len >= 200) return; // 内容正常，不打扰
+          var cssList = [];
+          Array.prototype.forEach.call(document.querySelectorAll("style,link[rel=stylesheet]"), function (el) {
+            cssList.push(el.tagName === "STYLE" ? "style(inline, " + (el.textContent || "").length + " chars)" : el.href);
+          });
+          var detail =
+            "App 在 3 秒内内容异常。\n" +
+            "root 存在: " + !!root + "\n" +
+            "root.innerHTML.length: " + len + "\n" +
+            "root 前 300 字符: " + (root ? root.innerHTML.slice(0, 300) : "(无)") + "\n" +
+            "已加载样式表: " + (cssList.length ? cssList.join("\n  ") : "(无!)") + "\n" +
+            "body 背景色: " + (document.body ? getComputedStyle(document.body).backgroundColor : "?") + "\n" +
+            "已捕获失败资源:\n" +
+            (failed.length ? failed.join("\n") : "(无)") +
+            "\nlocation: " + window.location.href;
+          show("诊断", detail);
+        }, 3000);
+      })();
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
