@@ -50,7 +50,7 @@ npm run tauri build    # 生成安装包（NSIS）
 
 ## 📦 下载
 
-请前往 [Releases](../../releases) 下载最新安装包（`小林若葉Manager_x.y.z_x64-setup.exe`）。
+请前往 [Releases](../../releases) 下载最新安装包（`exe`）。
 
 ---
 
