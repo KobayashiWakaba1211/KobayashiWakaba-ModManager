@@ -54,8 +54,10 @@ incremental = false
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
-codegen-units = 1
-lto = true
+# thin LTO：跨 crate 优化基本到位，构建时间与内存远低于 fat LTO，
+# 也不会在链接阶段卡死（fat LTO 在本项目上曾多次卡住不动）
+lto = "thin"
+codegen-units = 16
 opt-level = 3
 panic = "abort"
 strip = true
