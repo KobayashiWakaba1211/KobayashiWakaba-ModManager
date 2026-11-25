@@ -1,6 +1,6 @@
 # 第三方组件与许可声明
 
-本应用（小林若葉Manager / endfield-mod-manager）版本 0.1.1。
+本应用（小林若葉Manager / endfield-mod-manager）版本 0.1.2。
 分发二进制时，请随包附带本文件。
 
 完整依赖清单见仓库中的 `src-tauri/Cargo.lock`（Rust）与 `package-lock.json`（前端）。
