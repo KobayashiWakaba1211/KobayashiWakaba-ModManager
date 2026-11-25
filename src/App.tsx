@@ -504,6 +504,18 @@ function App() {
   const [dragActive, setDragActive] = useState(false);
   // 退出确认弹窗（点窗口关闭按钮时由后端事件触发）
   const [confirmExit, setConfirmExit] = useState(false);
+  // 启动时自动检查更新：发现新版则弹窗提示（网络失败静默跳过，不打扰）
+  const [startupUpdate, setStartupUpdate] = useState<AppUpdateInfo | null>(null);
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      invoke<AppUpdateInfo>("check_app_update")
+        .then((u) => {
+          if (u?.hasUpdate) setStartupUpdate(u);
+        })
+        .catch(() => {});
+    }, 1200);
+    return () => window.clearTimeout(t);
+  }, []);
   const [importCandidates, setImportCandidates] = useState<ImportCandidate[] | null>(null);
   // 整合包导入弹窗
   const [packOpen, setPackOpen] = useState(false);
@@ -1202,6 +1214,48 @@ function App() {
                 <button onClick={handleExitCancel}>取消</button>
                 <button className="primary" onClick={handleExitConfirm}>
                   退出
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 启动时发现新版本的弹窗 */}
+      {startupUpdate && (
+        <div className="modal-overlay" onClick={() => setStartupUpdate(null)}>
+          <div className="modal update-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>🚀 发现新版本 v{startupUpdate.latestVersion}</h3>
+            </div>
+            <div className="exit-body">
+              <p>
+                当前版本 v{startupUpdate.currentVersion}
+                {startupUpdate.publishedAt && ` · 新版发布于 ${startupUpdate.publishedAt}`}
+                ，建议更新以获得修复与新功能。
+              </p>
+              {startupUpdate.notes && (
+                <pre className="update-modal-notes">{startupUpdate.notes}</pre>
+              )}
+            </div>
+            <div className="modal-foot exit-foot">
+              <div className="modal-actions">
+                <button onClick={() => setStartupUpdate(null)}>稍后再说</button>
+                <button
+                  onClick={() => {
+                    openUrl(startupUpdate.releaseUrl).catch(() => {});
+                  }}
+                >
+                  打开发布页
+                </button>
+                <button
+                  className="primary"
+                  onClick={() => {
+                    openUrl(startupUpdate.downloadUrl).catch(() => {});
+                  }}
+                  title={startupUpdate.downloadUrl}
+                >
+                  ⬇ 下载安装包
                 </button>
               </div>
             </div>
@@ -5179,10 +5233,21 @@ function GameCover({
 }
 
 // ===== 设置视图 =====
+/** 检查更新接口的返回结构（check_app_update 命令） */
+type AppUpdateInfo = {
+  currentVersion: string;
+  latestVersion: string;
+  hasUpdate: boolean;
+  releaseUrl: string;
+  downloadUrl: string;
+  publishedAt: string;
+  notes: string;
+};
+
 /** 「关于」页面 */
 function AboutView() {
   const AUTHOR_URL = "https://github.com/KobayashiWakaba1211";
-  const APP_VERSION = "0.1.1";
+  const APP_VERSION = "0.1.2";
 
   // 完整许可清单：悬浮预览 + 点击打开 txt
   const [licText, setLicText] = useState("");
@@ -5229,6 +5294,22 @@ function AboutView() {
   function openLicenses() {
     setLicErr("");
     invoke<string>("open_license_file").catch((e) => setLicErr(String(e)));
+  }
+
+  // ===== 检查更新 =====
+  const [updChecking, setUpdChecking] = useState(false);
+  const [updInfo, setUpdInfo] = useState<AppUpdateInfo | null>(null);
+  const [updErr, setUpdErr] = useState("");
+
+  function checkUpdate() {
+    if (updChecking) return;
+    setUpdChecking(true);
+    setUpdErr("");
+    setUpdInfo(null);
+    invoke<AppUpdateInfo>("check_app_update")
+      .then(setUpdInfo)
+      .catch((e) => setUpdErr(String(e)))
+      .finally(() => setUpdChecking(false));
   }
 
   const features = [
@@ -5293,6 +5374,44 @@ function AboutView() {
             <p className="about-text">
               开发本意是降低使用门槛，让刚接触模组的新手也能轻松使用。
             </p>
+
+            {/* 检查更新 */}
+            <div className="update-row">
+              <button className="panel-btn" onClick={checkUpdate} disabled={updChecking}>
+                {updChecking ? "检查中…" : "🔄 检查更新"}
+              </button>
+              {updInfo && !updErr && (
+                <span className={updInfo.hasUpdate ? "update-ok" : "update-latest"}>
+                  {updInfo.hasUpdate
+                    ? `发现新版本 v${updInfo.latestVersion}（当前 v${updInfo.currentVersion}）`
+                    : `已是最新版本（v${updInfo.currentVersion}）`}
+                </span>
+              )}
+              {updErr && <span className="update-err">检查失败：{updErr}</span>}
+            </div>
+            {updInfo?.hasUpdate && (
+              <div className="update-panel">
+                <div className="update-panel-head">
+                  <span>
+                    v{updInfo.latestVersion} · {updInfo.publishedAt || "发布日期未知"}
+                  </span>
+                  <button
+                    className="panel-btn primary"
+                    onClick={() => openUrl(updInfo.downloadUrl).catch(() => {})}
+                    title={updInfo.downloadUrl}
+                  >
+                    ⬇ 下载安装包
+                  </button>
+                  <button
+                    className="panel-btn"
+                    onClick={() => openUrl(updInfo.releaseUrl).catch(() => {})}
+                  >
+                    打开发布页
+                  </button>
+                </div>
+                {updInfo.notes && <pre className="update-notes">{updInfo.notes}</pre>}
+              </div>
+            )}
           </div>
         </section>
 

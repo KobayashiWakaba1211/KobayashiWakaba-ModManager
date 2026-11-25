@@ -11,6 +11,7 @@ mod persist;
 mod preset;
 mod scan;
 mod toggle;
+mod update;
 
 use market::{cancel_market_download, market_categories, market_check_updates, market_comments, market_download, market_download_file, market_mod_detail, market_mods, market_search, market_top_subs};
 use tauri::Manager;
@@ -835,6 +836,12 @@ fn save_window_size() {
         cfg.window_height = h;
         let _ = save_config(&cfg);
     }
+}
+
+/// 检查应用更新：查询 GitHub Releases 最新版本并与当前版本比较
+#[tauri::command]
+async fn check_app_update() -> Result<update::UpdateInfo, String> {
+    update::check().await
 }
 
 /// 真正退出应用（仅在用户点击「退出」后调用）
@@ -1751,6 +1758,7 @@ pub fn run() {
             exit_app,
             get_license_text,
             open_license_file,
+            check_app_update,
             batch_import,
             modpack_analyze,
             modpack_inspect,

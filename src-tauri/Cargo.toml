@@ -1,6 +1,6 @@
 [package]
 name = "endfield-mod-manager"
-version = "0.1.1"
+version = "0.1.2"
 description = "小林若葉Manager - 面向多游戏 XXMI 生态的 Mod 管理器（QAQM 的 Rust 复刻版）"
 authors = ["小林若葉 (KobayashiWakaba1211)"]
 license = "GPL-3.0-only"
@@ -30,7 +30,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 sevenz-rust2 = { version = "0.25", default-features = false, features = ["aes256", "util"] }
 # RAR 解压：内置 UnRAR 源码静态编译，运行时不依赖系统任何 7-Zip / Bandizip（仅解压，未实现压缩）
 unrar = "0.5"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "charset"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "charset", "json"] }
 tokio = { version = "1", features = ["time"] }
 sha1 = "0.10"
 pinyin = "0.10"
