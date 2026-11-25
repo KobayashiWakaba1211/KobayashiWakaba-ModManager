@@ -5182,7 +5182,7 @@ function GameCover({
 /** 「关于」页面 */
 function AboutView() {
   const AUTHOR_URL = "https://github.com/KobayashiWakaba1211";
-  const APP_VERSION = "0.1.0";
+  const APP_VERSION = "0.1.1";
 
   // 完整许可清单：悬浮预览 + 点击打开 txt
   const [licText, setLicText] = useState("");

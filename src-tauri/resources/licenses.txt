@@ -122,7 +122,7 @@ dyn-clone                         1.0.20        MIT OR Apache-2.0
 embed_plist                       1.2.2         MIT OR Apache-2.0
 embed-resource                    3.0.12        MIT
 encoding_rs                       0.8.44        (Apache-2.0 OR MIT) AND BSD-3-Clause
-endfield-mod-manager              0.1.0         （未声明，见 crates.io）
+endfield-mod-manager              0.1.1         GPL-3.0-only
 endi                              1.1.1         MIT
 enumflags2                        0.7.12        MIT OR Apache-2.0
 enumflags2_derive                 0.7.12        MIT OR Apache-2.0
@@ -614,7 +614,7 @@ QAQM：同类模组管理器，仅作功能与交互参考；本应用继承了�
 ==============================================================================
 生成信息
 ==============================================================================
-生成时间: 2026-11-25T11:33:23.398Z
+生成时间: 2026-11-25T13:28:09.083Z
 Rust 依赖: 536 个   前端依赖: 5 个
 
 特殊许可组件 84 个（MPL / CDLA / ISC / BSD / Zlib / Unicode / Unlicense 等）：
