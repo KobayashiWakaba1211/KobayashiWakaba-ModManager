@@ -504,7 +504,7 @@ function App() {
   const [dragActive, setDragActive] = useState(false);
   // 退出确认弹窗（点窗口关闭按钮时由后端事件触发）
   const [confirmExit, setConfirmExit] = useState(false);
-  // 启动时自动检查更新：发现新版则弹窗提示（网络失败静默跳过，不打扰）
+  // 启动时自动检查更新：发现新版则弹窗提示；失败时用底部提示窗告知（不弹窗打扰）
   const [startupUpdate, setStartupUpdate] = useState<AppUpdateInfo | null>(null);
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -512,7 +512,9 @@ function App() {
         .then((u) => {
           if (u?.hasUpdate) setStartupUpdate(u);
         })
-        .catch(() => {});
+        .catch((e) => {
+          setError(`检查更新失败（已跳过）：${String(e)}`);
+        });
     }, 1200);
     return () => window.clearTimeout(t);
   }, []);
