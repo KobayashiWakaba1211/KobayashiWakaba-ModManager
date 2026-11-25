@@ -5431,6 +5431,16 @@ function AboutView() {
           </div>
         </section>
 
+        {/* 开发计划 */}
+        <section className="about-section">
+          <h3 className="settings-section-title">开发计划</h3>
+          <div className="about-card">
+            <ul className="about-list">
+              <li>暂无进一步开发计划，目前仅计划逐步补全所支持游戏的缩略图。</li>
+            </ul>
+          </div>
+        </section>
+
         {/* 使用说明 / 注意事项 */}
         <section className="about-section">
           <h3 className="settings-section-title">使用说明</h3>
