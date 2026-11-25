@@ -273,7 +273,90 @@ fn start_via_windows(exe: &str, args: &str) -> Result<(), String> {
         command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
     }
 
-    command.spawn().map_err(|e| format!("启动失败: {e}"))?;
+    match command.spawn() {
+        Ok(_) => Ok(()),
+        // ERROR_ELEVATION_REQUIRED(740)：目标 exe 的清单要求管理员权限（如 XXMI Launcher）。
+        // CreateProcess 无法跨权限拉起，改走 ShellExecute，由系统弹 UAC 授权后启动。
+        // 管理器自身保持普通权限（否则外部文件无法拖入窗口）。
+        Err(e) if e.raw_os_error() == Some(740) => {
+            #[cfg(windows)]
+            {
+                start_via_shell_execute(exe, &argv, dir).map_err(|e2| format!("{e}；改用提权启动仍失败：{e2}"))
+            }
+            #[cfg(not(windows))]
+            {
+                Err(format!("启动失败: {e}"))
+            }
+        }
+        Err(e) => Err(format!("启动失败: {e}")),
+    }
+}
+
+/// 把参数列表拼成 ShellExecute 用的命令行字符串（含空白的参数加引号）
+#[cfg(any(windows, test))]
+fn join_shell_args(argv: &[String]) -> String {
+    argv.iter()
+        .map(|a| {
+            if a.is_empty() || a.split_whitespace().count() > 1 {
+                format!("\"{a}\"")
+            } else {
+                a.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// 通过 ShellExecuteExW 启动。目标需要提权时，系统会弹出 UAC 授权框。
+#[cfg(windows)]
+fn start_via_shell_execute(exe: &str, argv: &[String], dir: &Path) -> Result<(), String> {
+    use windows_sys::Win32::Foundation::{GetLastError, HWND};
+    use windows_sys::Win32::UI::Shell::{ShellExecuteExW, SHELLEXECUTEINFOW};
+
+    const SEE_MASK_NOASYNC: u32 = 0x0000_0100;
+    const SEE_MASK_FLAG_NO_UI: u32 = 0x0000_0400;
+    const SW_SHOWNORMAL: i32 = 1;
+    const ERROR_CANCELLED: u32 = 1223;
+
+    let file: Vec<u16> = exe.encode_utf16().chain(std::iter::once(0)).collect();
+    let params_str = join_shell_args(argv);
+    let params: Vec<u16> = if params_str.is_empty() {
+        Vec::new()
+    } else {
+        params_str.encode_utf16().chain(std::iter::once(0)).collect()
+    };
+    let dir_str = dir.to_string_lossy().to_string();
+    let directory: Vec<u16> = if dir_str.is_empty() {
+        Vec::new()
+    } else {
+        dir_str.encode_utf16().chain(std::iter::once(0)).collect()
+    };
+
+    let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+    info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+    info.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+    info.hwnd = HWND::default();
+    info.lpFile = file.as_ptr() as *mut u16;
+    info.lpParameters = if params.is_empty() {
+        std::ptr::null_mut()
+    } else {
+        params.as_ptr() as *mut u16
+    };
+    info.lpDirectory = if directory.is_empty() {
+        std::ptr::null_mut()
+    } else {
+        directory.as_ptr() as *mut u16
+    };
+    info.nShow = SW_SHOWNORMAL;
+
+    let ok = unsafe { ShellExecuteExW(&mut info) };
+    if ok == 0 {
+        let code = unsafe { GetLastError() };
+        if code == ERROR_CANCELLED {
+            return Err("已取消管理员授权".to_string());
+        }
+        return Err(format!("系统拒绝启动 (os error {code})"));
+    }
     Ok(())
 }
 
@@ -366,6 +449,23 @@ mod tests {
         assert_eq!(supported_modes("endfield"), vec!["EFMI", "XXMI"]);
         assert_eq!(supported_modes("GenshinImpact"), vec!["GIML", "XXMI"]);
         assert_eq!(supported_modes("custom"), vec!["XXMI"]);
+    }
+
+    #[test]
+    fn shell_args_roundtrip() {
+        // 无空白的参数原样；含空白的加引号；空参数也加引号（否则会丢失）
+        assert_eq!(join_shell_args(&[]), "");
+        assert_eq!(
+            join_shell_args(&["--nogui".into(), "--xxmi".into(), "EFMI".into()]),
+            "--nogui --xxmi EFMI"
+        );
+        assert_eq!(
+            join_shell_args(&["-dx11".into(), "C:\\My Mods\\a b.ini".into(), String::new()]),
+            "-dx11 \"C:\\My Mods\\a b.ini\" \"\""
+        );
+        // 与 parse_launch_args 互逆：拼出来的字符串再解析应得到同一组参数
+        let argv = parse_launch_args("--nogui --xxmi EFMI -screen-width 1920");
+        assert_eq!(parse_launch_args(&join_shell_args(&argv)), argv);
     }
 
     #[test]
