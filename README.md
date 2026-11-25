@@ -2,6 +2,9 @@
 
 面向多游戏 XXMI 生态的 Mod 管理器，**QAQM 的 Rust 复刻版**。
 
+> **作者**：小林若葉（[@KobayashiWakaba1211](https://github.com/KobayashiWakaba1211)）
+> **AI 辅助**：本项目的绝大部分代码与文档由作者使用 **DeepSeek** 辅助完成。
+
 本工具以 **QAQM**（质量与可用性俱佳的 XXMI 系 Mod 管理器）为蓝本，使用 **Rust + Tauri 2** 重新实现，保留了 QAQM 的 Mod 目录结构约定，可直接接管其既有配置，并针对 `明日方舟：终末地`、`崩坏：星穹铁道`、`鸣潮`、`绝区零`、`原神` 等游戏做了原生支持。
 
 ---
@@ -65,6 +68,7 @@ npm run tauri build    # 生成安装包（NSIS）
 ## 🙏 致谢
 
 - QAQM —— 本项目的设计蓝本与 Mod 结构来源
+- [DeepSeek](https://www.deepseek.com/) —— 本项目绝大部分代码由作者借助 DeepSeek 编写
 - [Tauri](https://tauri.app/)、[React](https://react.dev/)、[Vite](https://vite.dev/)
 - GameBanana 官方 API
 - 各游戏的 Mod 社区与工具链作者
