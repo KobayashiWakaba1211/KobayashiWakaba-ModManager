@@ -14,6 +14,20 @@
   --ok: #4ade80;
   --err: #f87171;
   --warn: #fbbf24;
+  /* 浅色模式会覆盖以下语义变量 */
+  --border-strong: var(--border-strong);
+  --overlay-tint: rgba(18, 18, 26, 0.75);
+  --panel-grad: linear-gradient(180deg, #201f2e 0%, #1b1a27 100%);
+  --confirm-primary: #4a4a60;
+  --confirm-primary-hover: #585873;
+  --track: #3a3a4a;
+  --track-hover: #45455a;
+  --ok-panel-bg: #1c2620;
+  --err-panel-bg: #2a1e22;
+  --ok-text: #9ae6b4;
+  --err-text: #ffa0a0;
+  --danger-text: #ff5c5c;
+  --game-cover-fallback: linear-gradient(135deg, #1a1a2e, #2a2a40);
   --radius: 12px;
   --radius-lg: 16px;
   --radius-sm: 8px;
@@ -134,7 +148,7 @@ button {
   white-space: nowrap;
 }
 
-button:hover { background: var(--bg-hover); border-color: #3a3a4c; }
+button:hover { background: var(--bg-hover); border-color: var(--border-strong); }
 button:active { transform: scale(0.97); }
 
 button.primary {
@@ -207,7 +221,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .nav-list li:hover {
   background: var(--bg-hover);
   color: var(--text);
-  border-color: #3a3a4c;
+  border-color: var(--border-strong);
 }
 
 .nav-list li.active {
@@ -436,12 +450,12 @@ body.char-dragging .char-card:hover { transform: none; }
 
 .toast.error {
   border-color: rgba(248, 113, 113, 0.45);
-  background: #2a1e22;
+  background: var(--err-panel-bg);
 }
 
 .toast.ok {
   border-color: rgba(74, 222, 128, 0.4);
-  background: #1c2620;
+  background: var(--ok-panel-bg);
 }
 
 .toast-icon {
@@ -468,11 +482,11 @@ body.char-dragging .char-card:hover { transform: none; }
 }
 
 .toast.error .toast-text {
-  color: #ffa0a0;
+  color: var(--err-text);
 }
 
 .toast.ok .toast-text {
-  color: #9ae6b4;
+  color: var(--ok-text);
 }
 
 .toast-close {
@@ -529,7 +543,7 @@ body.char-dragging .char-card:hover { transform: none; }
   position: fixed;
   inset: 0;
   z-index: 900;
-  background: rgba(18, 18, 26, 0.82);
+  background: var(--overlay-tint);
   backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
@@ -664,7 +678,7 @@ body.char-dragging .char-card:hover { transform: none; }
 }
 
 .import-row:hover {
-  border-color: #3a3a4c;
+  border-color: var(--border-strong);
 }
 
 .import-row input[type="checkbox"] {
@@ -814,7 +828,7 @@ body.char-dragging .char-card:hover { transform: none; }
   transition: border-color 0.14s, background 0.14s;
 }
 
-.char-picker-btn:hover { background: var(--bg-hover); border-color: #3a3a4c; }
+.char-picker-btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
 .char-picker-btn:focus-visible { border-color: var(--accent); }
 .char-picker-btn.matched { border-color: rgba(74, 222, 128, 0.5); color: var(--ok); }
 .char-picker-btn.unmatched { border-color: rgba(251, 191, 36, 0.5); color: var(--warn); }
@@ -932,7 +946,7 @@ body.char-dragging .char-card:hover { transform: none; }
 .char-header-panel {
   margin: 0 24px 16px;
   padding: 16px 20px 14px;
-  background: linear-gradient(180deg, #201f2e 0%, #1b1a27 100%);
+  background: var(--panel-grad);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
@@ -1305,7 +1319,7 @@ body.char-dragging .char-card:hover { transform: none; }
   position: absolute;
   cursor: pointer;
   inset: 0;
-  background: #3a3a4a;
+  background: var(--track);
   border-radius: 999px;
   transition: background 0.2s;
 }
@@ -1419,7 +1433,7 @@ body.char-dragging .char-card:hover { transform: none; }
 }
 
 .single-mode-toggle:hover {
-  border-color: #3a3a4c;
+  border-color: var(--border-strong);
 }
 
 /* ===== 外观分区 ===== */
@@ -1479,7 +1493,7 @@ body.char-dragging .char-card:hover { transform: none; }
 }
 
 .section-card:hover {
-  border-color: #3a3a4c;
+  border-color: var(--border-strong);
 }
 
 .section-card.active {
@@ -1762,7 +1776,7 @@ body.char-dragging .char-card:hover { transform: none; }
 .confirm-title {
   font-size: 22px;
   font-weight: 800;
-  color: #ff5c5c;
+  color: var(--danger-text);
   letter-spacing: 2px;
   margin-bottom: 16px;
 }
@@ -1805,21 +1819,21 @@ body.char-dragging .char-card:hover { transform: none; }
 }
 
 .confirm-primary {
-  background: #4a4a60;
+  background: var(--confirm-primary);
   color: #fff;
 }
 
 .confirm-primary:hover {
-  background: #585873;
+  background: var(--confirm-primary-hover);
 }
 
 .confirm-cancel {
-  background: #3a3a4c;
+  background: var(--border-strong);
   color: var(--text-dim);
 }
 
 .confirm-cancel:hover {
-  background: #45455a;
+  background: var(--track-hover);
   color: var(--text);
 }
 
@@ -1841,7 +1855,7 @@ body.char-dragging .char-card:hover { transform: none; }
 
 .section-picker button:hover {
   color: var(--text);
-  border-color: #3a3a4c;
+  border-color: var(--border-strong);
 }
 
 .section-picker button.active {
@@ -1885,7 +1899,7 @@ body.char-dragging .char-card:hover { transform: none; }
 }
 
 .detail-mod-row:hover {
-  border-color: #3a3a4c;
+  border-color: var(--border-strong);
   background: var(--bg-elevated);
 }
 
@@ -1984,7 +1998,7 @@ body.char-dragging .char-card:hover { transform: none; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(18, 18, 26, 0.72);
+  background: var(--overlay-tint);
   color: var(--accent);
   font-size: 12.5px;
   font-weight: 600;
@@ -2343,7 +2357,7 @@ button.clear-cache:hover { background: var(--bg-hover); color: var(--warn); bord
 }
 
 .game-card:hover {
-  border-color: #3a3a4c;
+  border-color: var(--border-strong);
   transform: translateY(-2px);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
 }
@@ -2357,7 +2371,7 @@ button.clear-cache:hover { background: var(--bg-hover); color: var(--warn); bord
   position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: linear-gradient(135deg, #1a1a2e, #2a2a40);
+  background: var(--game-cover-fallback);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2570,8 +2584,8 @@ button.clear-cache:hover { background: var(--bg-hover); color: var(--warn); bord
 
 /* 滚动条 */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: #2e2e3e; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #3a3a4c; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
 /* ===== 关于页 ===== */
 .about-body {
@@ -3380,7 +3394,7 @@ button.clear-cache:hover { background: var(--bg-hover); color: var(--warn); bord
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(18, 18, 26, 0.6);
+  background: var(--overlay-tint);
   color: var(--text-dim);
   z-index: 60;
 }
@@ -4083,3 +4097,87 @@ button.clear-cache:hover { background: var(--bg-hover); color: var(--warn); bord
 .move-char-item:hover { background: var(--bg-elevated); }
 .move-char-item.active { background: var(--bg-elevated); color: var(--accent); }
 .move-char-count { color: var(--text-dim); font-size: 12px; }
+
+/* 主题切换（设置 → 界面） */
+.theme-toggle {
+  display: inline-flex;
+  gap: 8px;
+}
+.theme-toggle button {
+  padding: 7px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.theme-toggle button:hover { border-color: var(--accent); color: var(--accent); }
+.theme-toggle button.active {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ============================================================
+   ===== 浅色模式（html[data-theme="light"]） =====
+   深浅两套共用的变量在 :root 定义，浅色值在这里覆盖。
+   覆盖不到的深色表面（覆盖在图片上的玻璃层等）单独补丁。
+   ============================================================ */
+html[data-theme="light"] {
+  --bg: #f5f3f8;
+  --bg-panel: #ffffff;
+  --bg-elevated: #f7f4fa;
+  --bg-hover: #edeaf3;
+  --border: #d9d3e2;
+  --border-soft: #e8e3ee;
+  --border-strong: #c5bdd2;
+  --text: #2a2433;
+  --text-dim: #6d6679;
+  --text-faint: #a49dac;
+  --accent: #e0557a;
+  --accent-grad: linear-gradient(135deg, #e0557a 0%, #ff8fa3 100%);
+  --accent-glow: 0 4px 16px rgba(224, 85, 122, 0.22);
+  --ok: #18935a;
+  --err: #d64550;
+  --warn: #b7791f;
+  --overlay-tint: rgba(245, 243, 248, 0.8);
+  --panel-grad: linear-gradient(180deg, #ffffff 0%, #f7f4fa 100%);
+  --confirm-primary: #6d6679;
+  --confirm-primary-hover: #544e60;
+  --track: #d9d3e2;
+  --track-hover: #c5bdd2;
+  --ok-panel-bg: #eaf6ef;
+  --err-panel-bg: #fdeff0;
+  --ok-text: #157a4b;
+  --err-text: #c03e48;
+  --danger-text: #c03e48;
+  --game-cover-fallback: linear-gradient(135deg, #e8e3f0, #dcd5e8);
+}
+
+/* 深色面板上的半透明白色 hover/底色 → 浅色下用黑色半透明替代 */
+html[data-theme="light"] .char-header-actions .panel-btn { background: rgba(0, 0, 0, 0.03); }
+html[data-theme="light"] .toast-close:hover { background: rgba(0, 0, 0, 0.08); }
+html[data-theme="light"] .panel-btn { background: rgba(0, 0, 0, 0.02); }
+
+/* 强调色文字/边框在浅色下的对比度微调（半透明粉色调保持不变，白底上依然成立） */
+html[data-theme="light"] .banner.error { color: var(--err); }
+html[data-theme="light"] .banner.ok { color: var(--ok); }
+
+/* 深色文本色微调 */
+html[data-theme="light"] .dl-task-info.ok { color: var(--ok); }
+html[data-theme="light"] .dl-task-info.bad { color: var(--err); }
+html[data-theme="light"] .dl-task-done { border-left-color: var(--ok); }
+html[data-theme="light"] .dl-task-failed { border-left-color: var(--err); }
+html[data-theme="light"] .market-dl-cancel:hover,
+html[data-theme="light"] .dl-task-cancel:hover { color: var(--err); }
+html[data-theme="light"] .dl-task-open:hover { color: var(--ok); }
+
+/* 阴影在浅色下更轻 */
+html[data-theme="light"] .modal,
+html[data-theme="light"] .settings-panel,
+html[data-theme="light"] .toast {
+  box-shadow: 0 12px 32px rgba(42, 36, 51, 0.14);
+}
