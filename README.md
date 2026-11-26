@@ -17,7 +17,8 @@
 - **多游戏切换**：默认支持五款游戏，可自定义添加；每款游戏独立配置 Mod 文件夹与游戏程序路径。
 - **启动游戏**：支持原版启动与 EFMI/XXMI 等注入模式，通过全局配置的 XXMI Launcher 拉起。
 - **压缩包导入**：内置 zip / 7z / RAR 解压（无需安装 7-Zip / Bandizip），拖入即可导入。
-- **Persist Bridge 缓存**：兼容并接管 QAQM 的 Persist Bridge 缓存，无缝迁移。
+- **Persist Bridge 缓存**：兼容并接管 QAQM 的 Persist Bridge 缓存，基本无缝迁移，暂无失败案例。
+> 解决了QAQM的遗留问题，与QAQM不同的是，本工具的Persist Bridge缓存功能不会向d3dx.ini写入任何信息，而是往d3dx_user.ini内写入一行include，功能关闭时自动移除。
 
 > 由于继承了 QAQM 的 Mod 结构，可以直接接管 QAQM 已有的配置；Persist Bridge 缓存同样可无缝接管，切换过来无需重建。
 > 开发时作者无法兼顾所有游戏角色的缩略图，因此预留了自行添加缩略图/角色/皮肤分类的接口。未来也大概率不会再有更新。
