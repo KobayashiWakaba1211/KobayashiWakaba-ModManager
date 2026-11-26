@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -5288,7 +5289,10 @@ type AppUpdateInfo = {
 /** 「关于」页面 */
 function AboutView() {
   const AUTHOR_URL = "https://github.com/KobayashiWakaba1211";
-  const APP_VERSION = "0.1.2";
+  // 版本号从运行时读取（tauri.conf.json 的 version），避免手动同步遗漏；
+  // 读取失败时回退到打包时的常量（tauri build 会注入 TAURI_ENV_* ？不可靠，故再留一份手写兜底）
+  const FALLBACK_VERSION = "0.1.4";
+  const [appVersion, setAppVersion] = useState(FALLBACK_VERSION);
 
   // 完整许可清单：悬浮预览 + 点击打开 txt
   const [licText, setLicText] = useState("");
@@ -5298,6 +5302,11 @@ function AboutView() {
   const licBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
+    getVersion()
+      .then((v) => {
+        if (v) setAppVersion(v);
+      })
+      .catch(() => {});
     invoke<string>("get_license_text")
       .then((t) => setLicText(t || ""))
       .catch(() => {});
@@ -5405,7 +5414,7 @@ function AboutView() {
               <div className="about-head-text">
                 <div className="about-head-row">
                   <div className="about-logo">小林若葉Manager</div>
-                  <span className="about-version">v{APP_VERSION}</span>
+                  <span className="about-version">v{appVersion}</span>
                 </div>
               </div>
             </div>
