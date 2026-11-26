@@ -165,13 +165,14 @@ type LaunchConfig = {
   importer: string;
 };
 
-type NavKey = "characters" | "market" | "presets" | "games" | "settings" | "about";
+type NavKey = "characters" | "market" | "presets" | "games" | "personal" | "settings" | "about";
 
 const NAV_ITEMS: { key: NavKey; label: string; icon: string }[] = [
   { key: "characters", label: "角色一览", icon: "👤" },
   { key: "market", label: "Mod 市场", icon: "🛒" },
   { key: "presets", label: "预设配置", icon: "💾" },
   { key: "games", label: "切换游戏", icon: "🎮" },
+  { key: "personal", label: "个性化", icon: "🎨" },
   { key: "settings", label: "系统设置", icon: "⚙️" },
   { key: "about", label: "关于", icon: "ℹ️" },
 ];
@@ -187,6 +188,19 @@ function shortGameName(id: string): string {
       GenshinImpact: "原神",
     } as Record<string, string>
   )[id] || "游戏";
+}
+
+// ===== 主题 =====
+type ThemePref = "dark" | "light" | "system";
+
+function systemPrefersDark(): boolean {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+/** 按偏好设置 <html data-theme>；system 档实时解析系统深浅色 */
+function applyThemePref(pref: ThemePref) {
+  const effective = pref === "system" ? (systemPrefersDark() ? "dark" : "light") : pref;
+  document.documentElement.dataset.theme = effective;
 }
 
 function App() {
@@ -504,6 +518,28 @@ function App() {
   const [dragActive, setDragActive] = useState(false);
   // 退出确认弹窗（点窗口关闭按钮时由后端事件触发）
   const [confirmExit, setConfirmExit] = useState(false);
+  // 主题：启动时恢复偏好（深色/浅色/跟随系统），存 localStorage
+  useEffect(() => {
+    let saved = localStorage.getItem("emm-theme-pref") as ThemePref | null;
+    if (!saved) {
+      // 兼容旧版只存深/浅的键
+      const legacy = localStorage.getItem("emm-theme");
+      saved = legacy === "light" || legacy === "dark" ? legacy : "system";
+    }
+    if (saved !== "dark" && saved !== "light" && saved !== "system") saved = "system";
+    localStorage.setItem("emm-theme-pref", saved);
+    localStorage.removeItem("emm-theme");
+    applyThemePref(saved);
+    // 跟随系统档：系统切换深浅色时实时跟随
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => {
+      const cur = (localStorage.getItem("emm-theme-pref") as ThemePref) || "system";
+      if (cur === "system") applyThemePref("system");
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   // 启动时自动检查更新：发现新版则弹窗提示；失败时用底部提示窗告知（不弹窗打扰）
   const [startupUpdate, setStartupUpdate] = useState<AppUpdateInfo | null>(null);
   useEffect(() => {
@@ -1161,6 +1197,17 @@ function App() {
               onRemoveGame={handleRemoveGame}
               onRefreshGames={refreshGames}
             />
+          ) : nav === "personal" ? (
+            <PersonalizationView
+              cardSize={cardSize}
+              onCardSizeChange={handleCardSizeChange}
+              galleryCardSize={galleryCardSize}
+              onGalleryCardSizeChange={handleGalleryCardSizeChange}
+              marketHeroScale={marketHeroScale}
+              onMarketHeroScaleChange={handleMarketHeroScaleChange}
+              marketCardSize={marketCardSize}
+              onMarketCardSizeChange={handleMarketCardSizeChange}
+            />
           ) : nav === "about" ? (
             <AboutView />
           ) : (
@@ -1170,14 +1217,6 @@ function App() {
               onTogglePersist={handleTogglePersist}
               onClearPersist={handleClearPersistCache}
               onCacheSizeChange={handleCacheSizeChange}
-              cardSize={cardSize}
-              onCardSizeChange={handleCardSizeChange}
-              galleryCardSize={galleryCardSize}
-              onGalleryCardSizeChange={handleGalleryCardSizeChange}
-              marketHeroScale={marketHeroScale}
-              onMarketHeroScaleChange={handleMarketHeroScaleChange}
-              marketCardSize={marketCardSize}
-              onMarketCardSizeChange={handleMarketCardSizeChange}
               downloadDir={downloadDir}
               onChangeDownloadDir={handleChangeDownloadDir}
               activeGameName={games.find((g) => g.id === activeGameId)?.name || activeGameId}
@@ -5533,12 +5572,8 @@ function AboutView() {
   );
 }
 
-function SettingsView({
-  persistEnabled,
-  persistCacheSize,
-  onTogglePersist,
-  onClearPersist,
-  onCacheSizeChange,
+// ===== 个性化视图 =====
+function PersonalizationView({
   cardSize,
   onCardSizeChange,
   galleryCardSize,
@@ -5547,6 +5582,158 @@ function SettingsView({
   onMarketHeroScaleChange,
   marketCardSize,
   onMarketCardSizeChange,
+}: {
+  cardSize: number;
+  onCardSizeChange: (size: number) => void;
+  galleryCardSize: number;
+  onGalleryCardSizeChange: (size: number) => void;
+  marketHeroScale: number;
+  onMarketHeroScaleChange: (size: number) => void;
+  marketCardSize: number;
+  onMarketCardSizeChange: (size: number) => void;
+}) {
+  // 主题偏好（深色/浅色/跟随系统）：立即应用到 <html data-theme> 并持久化
+  const [themePref, setThemePref] = useState<ThemePref>(
+    () => (localStorage.getItem("emm-theme-pref") as ThemePref) || "system",
+  );
+  // 跟随系统档：停留在本页时系统切换深浅色也要实时跟随
+  useEffect(() => {
+    if (themePref !== "system") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => applyThemePref("system");
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [themePref]);
+  function changeThemePref(next: ThemePref) {
+    setThemePref(next);
+    localStorage.setItem("emm-theme-pref", next);
+    applyThemePref(next);
+  }
+
+  return (
+    <div className="view">
+      <div className="view-header">
+        <div>
+          <h2>个性化</h2>
+          <div className="subtitle">主题配色与各处卡片显示大小</div>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3 className="settings-section-title">主题</h3>
+        <div className="persist-card">
+          <div className="cache-size-row">
+            <label>配色主题：</label>
+            <div className="theme-toggle">
+              <button
+                className={themePref === "dark" ? "active" : ""}
+                onClick={() => changeThemePref("dark")}
+              >
+                🌙 深色
+              </button>
+              <button
+                className={themePref === "light" ? "active" : ""}
+                onClick={() => changeThemePref("light")}
+              >
+                ☀️ 浅色
+              </button>
+              <button
+                className={themePref === "system" ? "active" : ""}
+                onClick={() => changeThemePref("system")}
+              >
+                🖥️ 跟随系统
+              </button>
+            </div>
+            <p className="cache-size-hint">
+              界面配色主题。「跟随系统」会随 Windows 的深色/浅色模式实时切换。切换立即生效并自动保存。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3 className="settings-section-title">卡片大小</h3>
+        <div className="persist-card">
+          <div className="cache-size-row">
+            <label>
+              角色卡片大小：
+              <strong>{cardSize}px</strong>
+            </label>
+            <input
+              type="range"
+              min={120}
+              max={260}
+              step={2}
+              value={cardSize}
+              onChange={(e) => onCardSizeChange(Number(e.target.value))}
+            />
+            <p className="cache-size-hint">
+              角色一览卡片的显示宽度（{120}~{260}px）。行数和列数会随窗口大小和卡片大小自动增减，改动立即生效。
+            </p>
+          </div>
+          <div className="cache-size-row">
+            <label>
+              画廊卡片大小：
+              <strong>{galleryCardSize}px</strong>
+            </label>
+            <input
+              type="range"
+              min={140}
+              max={320}
+              step={2}
+              value={galleryCardSize}
+              onChange={(e) => onGalleryCardSizeChange(Number(e.target.value))}
+            />
+            <p className="cache-size-hint">
+              角色详情页画廊视图的 Mod 卡片宽度（{140}~{320}px）。改动立即生效。
+            </p>
+          </div>
+          <div className="cache-size-row">
+            <label>
+              市场大卡片大小：
+              <strong>{marketHeroScale}%</strong>
+            </label>
+            <input
+              type="range"
+              min={40}
+              max={100}
+              step={5}
+              value={marketHeroScale}
+              onChange={(e) => onMarketHeroScaleChange(Number(e.target.value))}
+            />
+            <p className="cache-size-hint">
+              Mod 市场首页顶部轮播推荐卡片的显示大小（{40}~{100}%，相对内容区宽度）。等比缩放：宽度变，高度按 11:4 比例跟随，卡片居中、两侧留白，封面不会变形。改动立即生效。
+            </p>
+          </div>
+          <div className="cache-size-row">
+            <label>
+              市场小卡片大小：
+              <strong>{marketCardSize}px</strong>
+            </label>
+            <input
+              type="range"
+              min={150}
+              max={320}
+              step={2}
+              value={marketCardSize}
+              onChange={(e) => onMarketCardSizeChange(Number(e.target.value))}
+            />
+            <p className="cache-size-hint">
+              Mod 市场 Mod 网格卡片的显示宽度（{150}~{320}px），与「角色卡片大小」相同的自适应方式：列数随窗口宽度自动增减。改动立即生效。
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsView({
+  persistEnabled,
+  persistCacheSize,
+  onTogglePersist,
+  onClearPersist,
+  onCacheSizeChange,
   downloadDir,
   onChangeDownloadDir,
   activeGameName,
@@ -5562,14 +5749,6 @@ function SettingsView({
   onTogglePersist: () => void;
   onClearPersist: () => void;
   onCacheSizeChange: (size: number) => void;
-  cardSize: number;
-  onCardSizeChange: (size: number) => void;
-  galleryCardSize: number;
-  onGalleryCardSizeChange: (size: number) => void;
-  marketHeroScale: number;
-  onMarketHeroScaleChange: (size: number) => void;
-  marketCardSize: number;
-  onMarketCardSizeChange: (size: number) => void;
   downloadDir: string;
   onChangeDownloadDir: () => void;
   activeGameName: string;
@@ -5632,7 +5811,7 @@ function SettingsView({
       <div className="view-header">
         <div>
           <h2>系统设置</h2>
-          <div className="subtitle">当前游戏、界面、下载与 Persist Bridge 配置</div>
+          <div className="subtitle">当前游戏、下载与 Persist Bridge 配置</div>
         </div>
       </div>
 
@@ -5728,80 +5907,6 @@ function SettingsView({
             这是<strong>全局设置，配置一次所有游戏共用</strong>，切换游戏时不会变化。
             留空时会自动从 XXMI Launcher 的默认安装位置推断。
           </p>
-        </div>
-      </div>
-
-      <div className="settings-section">
-        <h3 className="settings-section-title">界面</h3>
-        <div className="persist-card">
-          <div className="cache-size-row">
-            <label>
-              角色卡片大小：
-              <strong>{cardSize}px</strong>
-            </label>
-            <input
-              type="range"
-              min={120}
-              max={260}
-              step={2}
-              value={cardSize}
-              onChange={(e) => onCardSizeChange(Number(e.target.value))}
-            />
-            <p className="cache-size-hint">
-              角色一览卡片的显示宽度（{120}~{260}px）。行数和列数会随窗口大小和卡片大小自动增减，改动立即生效。
-            </p>
-          </div>
-          <div className="cache-size-row">
-            <label>
-              画廊卡片大小：
-              <strong>{galleryCardSize}px</strong>
-            </label>
-            <input
-              type="range"
-              min={140}
-              max={320}
-              step={2}
-              value={galleryCardSize}
-              onChange={(e) => onGalleryCardSizeChange(Number(e.target.value))}
-            />
-            <p className="cache-size-hint">
-              角色详情页画廊视图的 Mod 卡片宽度（{140}~{320}px）。改动立即生效。
-            </p>
-          </div>
-          <div className="cache-size-row">
-            <label>
-              市场大卡片大小：
-              <strong>{marketHeroScale}%</strong>
-            </label>
-            <input
-              type="range"
-              min={40}
-              max={100}
-              step={5}
-              value={marketHeroScale}
-              onChange={(e) => onMarketHeroScaleChange(Number(e.target.value))}
-            />
-            <p className="cache-size-hint">
-              Mod 市场首页顶部轮播推荐卡片的显示大小（{40}~{100}%，相对内容区宽度）。等比缩放：宽度变，高度按 11:4 比例跟随，卡片居中、两侧留白，封面不会变形。改动立即生效。
-            </p>
-          </div>
-          <div className="cache-size-row">
-            <label>
-              市场小卡片大小：
-              <strong>{marketCardSize}px</strong>
-            </label>
-            <input
-              type="range"
-              min={150}
-              max={320}
-              step={2}
-              value={marketCardSize}
-              onChange={(e) => onMarketCardSizeChange(Number(e.target.value))}
-            />
-            <p className="cache-size-hint">
-              Mod 市场 Mod 网格卡片的显示宽度（{150}~{320}px），与「角色卡片大小」相同的自适应方式：列数随窗口宽度自动增减。改动立即生效。
-            </p>
-          </div>
         </div>
       </div>
 
