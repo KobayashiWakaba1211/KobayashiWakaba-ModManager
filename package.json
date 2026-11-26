@@ -1,7 +1,7 @@
 {
   "name": "endfield-mod-manager",
   "private": true,
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "小林若葉Manager - 面向多游戏 XXMI 生态的 Mod 管理器（QAQM 的 Rust 复刻版）",
   "author": "小林若葉 (KobayashiWakaba1211)",
   "license": "GPL-3.0-only",

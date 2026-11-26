@@ -643,7 +643,13 @@ pub fn rebuild_active_includes(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// 确保 qaqm_includer.ini 挂到 d3dx.ini
+/// 确保 qaqm_includer.ini 挂到 d3dx_user.ini（而非 d3dx.ini）
+///
+/// 挂载点选择：3DMigoto 启动时会自动加载 `d3dx_user.ini`（官方保留的用户覆盖文件，
+/// 游戏更新永远不会覆盖它），并处理其中的 [Include] 段。写到这个文件：
+/// 1. 完全不动 `d3dx.ini`（XXMI/游戏本体所有，更新时可能被覆盖，也是 QAQM 被诟病冲突的原因）
+/// 2. `d3dx_user.ini` 本来就是给用户自定义用的，第三方追加一行 include 冲突面最小
+/// 3. 旧版本曾挂到 d3dx.ini，这里顺带把旧行清理掉（迁移）
 pub fn ensure_includer_mounted(root: &Path) -> Result<(), String> {
     ensure_bridge_dir(root)?;
     let includer_path = bridge_dir(root).join(QAQM_INCLUDER_FILE);
@@ -654,23 +660,64 @@ pub fn ensure_includer_mounted(root: &Path) -> Result<(), String> {
     content = ensure_include_entry(&content, "IncludePersistBridgeActive", PERSIST_ACTIVE_INCLUDE_FILE);
     fs::write(&includer_path, &content).map_err(|e| format!("写 includer 失败: {e}"))?;
 
-    // 挂到 d3dx.ini
-    let d3dx_path = root.join("d3dx.ini");
-    if !d3dx_path.exists() {
-        return Err("d3dx.ini 不存在".into());
+    // 挂到 d3dx_user.ini（不存在则创建）
+    let user_path = root.join("d3dx_user.ini");
+    if !user_path.exists() {
+        fs::write(&user_path, "").map_err(|e| format!("创建 d3dx_user.ini 失败: {e}"))?;
     }
-    let d3dx_content = fs::read_to_string(&d3dx_path).map_err(|e| format!("读 d3dx.ini 失败: {e}"))?;
-    let include_line = "include = qaqm\\qaqm_includer.ini";
-    if !d3dx_content.lines().any(|l| l.trim() == include_line) {
-        // 备份
-        let bak = root.join("d3dx.ini.qaqmbak");
+    let user_content =
+        fs::read_to_string(&user_path).map_err(|e| format!("读 d3dx_user.ini 失败: {e}"))?;
+    if ensure_include_entry(&user_content, "Include", "qaqm\\qaqm_includer.ini") != user_content {
+        // 首次修改前整份备份
+        let bak = root.join("d3dx_user.ini.qaqmbak");
         if !bak.exists() {
-            let _ = fs::copy(&d3dx_path, &bak);
+            let _ = fs::copy(&user_path, &bak);
         }
-        let new_content = ensure_include_entry(&d3dx_content, "Include", include_line.trim());
-        fs::write(&d3dx_path, new_content).map_err(|e| format!("写 d3dx.ini 失败: {e}"))?;
+        let new_content = ensure_include_entry(&user_content, "Include", "qaqm\\qaqm_includer.ini");
+        fs::write(&user_path, new_content).map_err(|e| format!("写 d3dx_user.ini 失败: {e}"))?;
+    }
+
+    // 旧版本曾把 include 挂在 d3dx.ini 上：迁移时清理掉
+    let d3dx_path = root.join("d3dx.ini");
+    if d3dx_path.exists() {
+        remove_include_line(&d3dx_path, "qaqm\\qaqm_includer.ini")?;
     }
     Ok(())
+}
+
+/// 从 Persist Bridge 卸载：把 include 行从 d3dx_user.ini（及旧版遗留的 d3dx.ini）里移除
+pub fn unmount_includer(root: &Path) -> Result<(), String> {
+    let user_path = root.join("d3dx_user.ini");
+    remove_include_line(&user_path, "qaqm\\qaqm_includer.ini")?;
+    let d3dx_path = root.join("d3dx.ini");
+    if d3dx_path.exists() {
+        remove_include_line(&d3dx_path, "qaqm\\qaqm_includer.ini")?;
+    }
+    Ok(())
+}
+
+/// 从 ini 文件里删除指定的 include 行（存在才改，返回是否修改）
+fn remove_include_line(path: &Path, target: &str) -> Result<bool, String> {
+    if !path.exists() {
+        return Ok(false);
+    }
+    let content = fs::read_to_string(path).map_err(|e| format!("读 {} 失败: {e}", path.display()))?;
+    let include_line = format!("include = {target}");
+    let normalized = content.replace("\r\n", "\n");
+    let mut removed = false;
+    let mut out: Vec<&str> = Vec::new();
+    for line in normalized.split('\n') {
+        if line.trim() == include_line {
+            removed = true;
+            continue;
+        }
+        out.push(line);
+    }
+    if removed {
+        let new_content = out.join("\n");
+        fs::write(path, &new_content).map_err(|e| format!("写 {} 失败: {e}", path.display()))?;
+    }
+    Ok(removed)
 }
 
 // ===== 公共 API（供 toggle 等调用） =====
@@ -1025,5 +1072,34 @@ mod tests {
         assert!(out.contains("; Persisted state is hosted by qaqm_state_abc123.ini"));
         assert!(!out.contains("global persist $skirt"));
         assert!(out.contains("$\\QAQM\\Persist\\Bridge_abc123\\skirt"));
+    }
+
+    #[test]
+    fn test_mount_into_d3dx_user_and_unmount() {
+        let dir = std::env::temp_dir().join(format!("qaqm-mount-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        // 模拟旧版本遗留：d3dx.ini 里挂着 include
+        fs::write(
+            dir.join("d3dx.ini"),
+            "[Constants]\r\nx = 1\r\n[Include]\r\ninclude = qaqm\\qaqm_includer.ini\r\n",
+        )
+        .unwrap();
+
+        ensure_includer_mounted(&dir).unwrap();
+        // 挂载应落到 d3dx_user.ini
+        let user = fs::read_to_string(dir.join("d3dx_user.ini")).unwrap();
+        assert!(user.contains("include = qaqm\\qaqm_includer.ini"));
+        // 旧版遗留的 d3dx.ini 行应被清理
+        let d3dx = fs::read_to_string(dir.join("d3dx.ini")).unwrap();
+        assert!(!d3dx.contains("qaqm_includer"));
+
+        // 卸载：两处都不再有
+        unmount_includer(&dir).unwrap();
+        let user2 = fs::read_to_string(dir.join("d3dx_user.ini")).unwrap();
+        assert!(!user2.contains("qaqm_includer"));
+        // 其他内容保留
+        assert!(user2.contains("[Include]"));
+        let _ = fs::remove_dir_all(&dir);
     }
 }

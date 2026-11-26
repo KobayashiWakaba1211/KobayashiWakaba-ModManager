@@ -1605,9 +1605,10 @@ fn set_persist_enabled(enabled: bool) -> Result<(), String> {
                 persist::ensure_includer_mounted(root)?;
                 persist::rebuild_active_includes(root)?;
             } else {
-                // 禁用：还原所有 .qaqm-persistbak，清空缓存
+                // 禁用：还原所有 .qaqm-persistbak，清空缓存，并从 d3dx_user.ini / d3dx.ini 卸载挂载
                 persist::restore_all_mods(root)?;
                 persist::clear_cache(root)?;
+                persist::unmount_includer(root)?;
             }
         }
     }
