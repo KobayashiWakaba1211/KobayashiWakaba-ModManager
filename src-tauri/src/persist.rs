@@ -359,7 +359,7 @@ fn collect_ini_files(dir: &Path, list: &mut Vec<PathBuf>) {
         let p = entry.path();
         if p.is_dir() {
             collect_ini_files(&p, list);
-        } else if p.extension().map(|e| e.to_string_lossy().to_lowercase()) == Some(".ini".to_string()) {
+        } else if p.extension().map(|e| e.to_string_lossy().to_lowercase()) == Some("ini".to_string()) {
             list.push(p);
         }
     }
