@@ -39,6 +39,7 @@ dist_stale_*/
 
 # 调试/临时产物
 *.log
+*.tsbuildinfo
 .cdp-upd.mjs
 cover-verify.png
 market-screenshot.png

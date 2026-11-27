@@ -2,7 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+
+static CONFIG_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -45,6 +49,10 @@ pub struct AppConfig {
     /// 窗口高度（px，0 = 未记录，用默认 600）
     #[serde(default)]
     pub window_height: u32,
+    /// 悬浮窗全局快捷键
+    pub overlay_hotkey: String,
+    #[serde(skip)]
+    original: Option<serde_json::Value>,
 }
 
 impl Default for AppConfig {
@@ -64,6 +72,8 @@ impl Default for AppConfig {
             xxmi_launcher_path: String::new(),
             window_width: 0,
             window_height: 0,
+            overlay_hotkey: "Alt+F".to_string(),
+            original: None,
         }
     }
 }
@@ -168,32 +178,281 @@ pub fn config_path() -> PathBuf {
     config_dir().join("config.json")
 }
 
+fn read_config(path: &Path) -> Result<(AppConfig, serde_json::Value), String> {
+    let raw = match fs::read_to_string(path) {
+        Ok(raw) => raw,
+        Err(e) if e.kind() == ErrorKind::NotFound => {
+            let cfg = AppConfig::default();
+            let value = serde_json::to_value(&cfg).map_err(|e| format!("序列化配置失败: {e}"))?;
+            return Ok((cfg, value));
+        }
+        Err(e) => return Err(format!("读取配置失败: {e}")),
+    };
+    let value: serde_json::Value =
+        serde_json::from_str(&raw).map_err(|e| format!("配置文件损坏，已保留原文件: {e}"))?;
+    let cfg = serde_json::from_value(value.clone())
+        .map_err(|e| format!("配置格式无效，已保留原文件: {e}"))?;
+    Ok((cfg, value))
+}
+
 pub fn load_config() -> AppConfig {
-    let path = config_path();
-    if let Ok(raw) = fs::read_to_string(&path) {
-        if let Ok(cfg) = serde_json::from_str::<AppConfig>(&raw) {
-            return cfg;
+    let result = CONFIG_LOCK
+        .lock()
+        .map_err(|e| format!("配置锁不可用: {e}"))
+        .and_then(|_guard| read_config(&config_path()));
+    match result {
+        Ok((mut cfg, _)) => {
+            cfg.original = serde_json::to_value(&cfg).ok();
+            cfg
+        }
+        Err(e) => {
+            eprintln!("{e}");
+            AppConfig::default()
         }
     }
-    AppConfig::default()
+}
+
+// 只应用调用者实际更改的字段；同一字段并发更改时拒绝覆盖。
+fn merge_changes(
+    base: &serde_json::Value,
+    edited: &serde_json::Value,
+    current: &mut serde_json::Value,
+) -> Result<(), String> {
+    if base == edited {
+        return Ok(());
+    }
+    if let (Some(base_items), Some(edited_items), Some(current_items)) =
+        (base.as_array(), edited.as_array(), current.as_array_mut())
+    {
+        let id = |v: &serde_json::Value| v.get("id").and_then(|v| v.as_str()).map(str::to_owned);
+        let old_order: Vec<_> = base_items
+            .iter()
+            .filter_map(&id)
+            .filter(|key| edited_items.iter().any(|v| id(v).as_ref() == Some(key)))
+            .collect();
+        let new_order: Vec<_> = edited_items
+            .iter()
+            .filter_map(&id)
+            .filter(|key| base_items.iter().any(|v| id(v).as_ref() == Some(key)))
+            .collect();
+        if old_order == new_order
+            && base_items
+                .iter()
+                .chain(edited_items)
+                .chain(current_items.iter())
+                .all(|v| id(v).is_some())
+        {
+            for old in base_items {
+                let Some(old_id) = id(old) else { continue };
+                let edited_item = edited_items
+                    .iter()
+                    .find(|v| id(v).as_deref() == Some(&old_id));
+                let position = current_items
+                    .iter()
+                    .position(|v| id(v).as_deref() == Some(&old_id));
+                match (edited_item, position) {
+                    (Some(new), Some(pos)) => merge_changes(old, new, &mut current_items[pos])?,
+                    (None, Some(pos)) if &current_items[pos] == old => {
+                        current_items.remove(pos);
+                    }
+                    (None, None) => {}
+                    (Some(new), None) if new == old => {}
+                    _ => return Err("配置已被其他操作修改，请重试".into()),
+                }
+            }
+            for new in edited_items {
+                let Some(new_id) = id(new) else { continue };
+                if !base_items.iter().any(|v| id(v).as_deref() == Some(&new_id)) {
+                    match current_items
+                        .iter()
+                        .find(|v| id(v).as_deref() == Some(&new_id))
+                    {
+                        Some(existing) if existing != new => {
+                            return Err("配置已被其他操作修改，请重试".into());
+                        }
+                        Some(_) => {}
+                        None => current_items.push(new.clone()),
+                    }
+                }
+            }
+            return Ok(());
+        }
+    }
+    if let (Some(base), Some(edited), Some(current)) = (
+        base.as_object(),
+        edited.as_object(),
+        current.as_object_mut(),
+    ) {
+        for (key, old) in base {
+            if !edited.contains_key(key) {
+                match current.get(key) {
+                    Some(value) if value != old => {
+                        return Err("配置已被其他操作修改，请重试".into());
+                    }
+                    Some(_) => {
+                        current.remove(key);
+                    }
+                    None => {}
+                }
+            }
+        }
+        for (key, value) in edited {
+            match base.get(key) {
+                Some(old) if old != value => {
+                    let target = current.entry(key.clone()).or_insert_with(|| old.clone());
+                    merge_changes(old, value, target)?;
+                }
+                None => match current.get(key) {
+                    Some(existing) if existing != value => {
+                        return Err("配置已被其他操作修改，请重试".into());
+                    }
+                    Some(_) => {}
+                    None => {
+                        current.insert(key.clone(), value.clone());
+                    }
+                },
+                _ => {}
+            }
+        }
+        return Ok(());
+    }
+    if current != base && current != edited {
+        return Err("配置已被其他操作修改，请重试".into());
+    }
+    *current = edited.clone();
+    Ok(())
 }
 
 pub fn save_config(cfg: &AppConfig) -> Result<(), String> {
-    let dir = config_dir();
-    fs::create_dir_all(&dir).map_err(|e| format!("创建配置目录失败: {e}"))?;
-    let path = config_path();
-    let raw = serde_json::to_string_pretty(cfg).map_err(|e| format!("序列化配置失败: {e}"))?;
-    fs::write(&path, raw).map_err(|e| format!("写入配置失败: {e}"))?;
+    let _guard = CONFIG_LOCK
+        .lock()
+        .map_err(|e| format!("配置锁不可用: {e}"))?;
+    save_config_at(&config_path(), cfg)
+}
+
+fn save_config_at(path: &Path, cfg: &AppConfig) -> Result<(), String> {
+    let base = cfg
+        .original
+        .as_ref()
+        .ok_or("配置未成功读取，拒绝覆盖原文件")?;
+    let dir = path.parent().ok_or("配置路径无父目录")?;
+    fs::create_dir_all(dir).map_err(|e| format!("创建配置目录失败: {e}"))?;
+    let lock = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(dir.join("config.lock"))
+        .map_err(|e| format!("打开配置锁失败: {e}"))?;
+    lock.lock().map_err(|e| format!("锁定配置失败: {e}"))?;
+    let (current_cfg, mut current_raw) = read_config(path)?;
+    let current = serde_json::to_value(&current_cfg).map_err(|e| format!("序列化配置失败: {e}"))?;
+    let edited = serde_json::to_value(cfg).map_err(|e| format!("序列化配置失败: {e}"))?;
+    let mut merged = current;
+    merge_changes(base, &edited, &mut merged)?;
+    merge_changes(
+        &serde_json::to_value(&current_cfg).map_err(|e| format!("序列化配置失败: {e}"))?,
+        &merged,
+        &mut current_raw,
+    )?;
+    let raw =
+        serde_json::to_vec_pretty(&current_raw).map_err(|e| format!("序列化配置失败: {e}"))?;
+    let mut tmp =
+        tempfile::NamedTempFile::new_in(dir).map_err(|e| format!("创建临时配置失败: {e}"))?;
+    tmp.write_all(&raw)
+        .and_then(|()| tmp.as_file().sync_all())
+        .map_err(|e| format!("写入临时配置失败: {e}"))?;
+    tmp.persist(path)
+        .map_err(|e| format!("替换配置文件失败: {}", e.error))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn snapshot(path: &Path) -> AppConfig {
+        let (mut cfg, _) = read_config(path).expect("读取测试配置");
+        cfg.original = Some(serde_json::to_value(&cfg).expect("序列化测试配置"));
+        cfg
+    }
+
+    #[test]
+    fn concurrent_snapshots_preserve_independent_changes_and_unknown_fields() {
+        let dir = tempfile::tempdir().expect("创建临时目录");
+        let path = dir.path().join("config.json");
+        fs::write(&path, r#"{"future_field":{"keep":true}}"#).expect("写入配置");
+        let mut first = snapshot(&path);
+        let mut second = snapshot(&path);
+        first.card_size = 180;
+        second.overlay_hotkey = "Ctrl+F".into();
+        save_config_at(&path, &first).expect("保存第一个修改");
+        save_config_at(&path, &second).expect("保存第二个修改");
+        let (result, raw) = read_config(&path).expect("读取结果");
+        assert_eq!(result.card_size, 180);
+        assert_eq!(result.overlay_hotkey, "Ctrl+F");
+        assert_eq!(raw["future_field"]["keep"], true);
+    }
+
+    #[test]
+    fn conflicting_snapshots_are_rejected() {
+        let dir = tempfile::tempdir().expect("创建临时目录");
+        let path = dir.path().join("config.json");
+        let mut first = snapshot(&path);
+        let mut second = snapshot(&path);
+        first.card_size = 180;
+        second.card_size = 200;
+        save_config_at(&path, &first).expect("保存第一个修改");
+        assert!(save_config_at(&path, &second).is_err());
+        assert_eq!(read_config(&path).expect("读取结果").0.card_size, 180);
+    }
+
+    #[test]
+    fn simultaneous_writes_are_serialized() {
+        let dir = tempfile::tempdir().expect("创建临时目录");
+        let path = dir.path().join("config.json");
+        let mut first = snapshot(&path);
+        let mut second = snapshot(&path);
+        first.card_size = 180;
+        second.gallery_card_size = 240;
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let other_path = path.clone();
+        let other_barrier = barrier.clone();
+        let thread = std::thread::spawn(move || {
+            other_barrier.wait();
+            save_config_at(&other_path, &first)
+        });
+        barrier.wait();
+        save_config_at(&path, &second).expect("保存第二个修改");
+        thread
+            .join()
+            .expect("线程正常结束")
+            .expect("保存第一个修改");
+        let result = read_config(&path).expect("读取结果").0;
+        assert_eq!((result.card_size, result.gallery_card_size), (180, 240));
+    }
+
+    #[test]
+    fn corrupt_configuration_is_never_overwritten() {
+        let dir = tempfile::tempdir().expect("创建临时目录");
+        let path = dir.path().join("config.json");
+        let cfg = snapshot(&path);
+        fs::write(&path, "{broken").expect("写入损坏配置");
+        assert!(save_config_at(&path, &cfg).is_err());
+        assert_eq!(fs::read_to_string(&path).expect("读取原文件"), "{broken");
+        assert!(save_config_at(&path, &AppConfig::default()).is_err());
+    }
 }
 
 /// 判断路径是否是一个 Mods 目录（路径任一层级的名字含 "mods"，大小写不敏感）
 pub fn is_mods_path(p: &str) -> bool {
     let t = p.trim();
     !t.is_empty()
-        && Path::new(t)
-            .components()
-            .any(|c| c.as_os_str().to_string_lossy().to_lowercase().contains("mods"))
+        && Path::new(t).components().any(|c| {
+            c.as_os_str()
+                .to_string_lossy()
+                .to_lowercase()
+                .contains("mods")
+        })
 }
 
 /// 校验 mods_path（只要求路径含 mods，不要求目录当前就存在）

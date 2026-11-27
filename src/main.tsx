@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import Overlay from "./Overlay";
 import "./App.css";
 
 class ErrorBoundary extends React.Component<
@@ -63,7 +64,7 @@ class ErrorBoundary extends React.Component<
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      {new URLSearchParams(window.location.search).get("window") === "overlay" ? <Overlay /> : <App />}
     </ErrorBoundary>
   </React.StrictMode>,
 );

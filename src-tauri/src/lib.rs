@@ -7,6 +7,7 @@ mod instance;
 mod launch;
 mod market;
 mod modpack;
+mod overlay;
 mod persist;
 mod preset;
 mod scan;
@@ -1673,6 +1674,18 @@ pub fn run() {
         .manage(market::CancelRegistry(std::sync::Mutex::new(std::collections::HashMap::new())))
         .plugin(tauri_plugin_dialog::init())
         .on_window_event(|window, event| {
+            if window.label() == "overlay" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    if let Err(e) = window.hide() {
+                        eprintln!("隐藏悬浮窗失败: {e}");
+                    }
+                }
+                return;
+            }
+            if window.label() != "main" {
+                return;
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if !EXITING.load(std::sync::atomic::Ordering::Relaxed) {
                     // 拦下关闭，交给前端弹二次确认
@@ -1690,9 +1703,10 @@ pub fn run() {
             }
         })
         .setup(|app| {
-            // 恢复上次关闭时的窗口大小
+            // 恢复上次关闭时的窗口大小，并按配置注册悬浮窗全局热键
             use tauri::Manager;
             let cfg = load_config();
+            overlay::init_hotkey(app.handle().clone(), &cfg.overlay_hotkey);
             if cfg.window_width >= 200 && cfg.window_height >= 200 {
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.set_size(tauri::LogicalSize::new(
@@ -1704,6 +1718,12 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            overlay::open_overlay,
+            overlay::hide_overlay,
+            overlay::notify_overlay_state_changed,
+            overlay::get_overlay_hotkey,
+            overlay::set_overlay_hotkey,
+            overlay::check_hotkey_available,
             list_games,
             get_active_game_id,
             set_active_game,

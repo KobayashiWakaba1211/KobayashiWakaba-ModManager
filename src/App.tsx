@@ -6,6 +6,7 @@ import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { BUILTIN_COVERS } from "./builtinCovers";
 import "./App.css";
@@ -209,6 +210,7 @@ function App() {
   const [activeGameId, setActiveGameId] = useState("");
   const [modsPath, setModsPath] = useState("");
   const [groups, setGroups] = useState<CharacterGroup[]>([]);
+  const [singleMode, setSingleMode] = useState(() => localStorage.getItem("qaqm.singleMode") === "1");
   const [nav, setNav] = useState<NavKey>("characters");
   const [selectedChar, setSelectedChar] = useState<string>("");
   const [presets, setPresets] = useState<Preset[]>([]);
@@ -559,10 +561,29 @@ function App() {
   // 整合包导入弹窗
   const [packOpen, setPackOpen] = useState(false);
 
+  const gamesRevision = useRef(0);
+  const refreshRevision = useRef(0);
+  const activeGameRef = useRef("");
+  const singleModeSaving = useRef(false);
+
   async function refreshGames() {
-    const gs = await invoke<Game[]>("list_games");
+    const version = ++gamesRevision.current;
+    const [gs, active] = await Promise.all([
+      invoke<Game[]>("list_games"),
+      invoke<string>("get_active_game_id"),
+    ]);
+    if (version !== gamesRevision.current) return;
+    if (activeGameRef.current !== active) {
+      activeGameRef.current = active;
+      refreshRevision.current++;
+      setSelectedChar("");
+      setGroups([]);
+      setModsPath("");
+      setPresets([]);
+      setUpdateKeys([]);
+      updatesCheckedRef.current = false;
+    }
     setGames(gs);
-    const active = await invoke<string>("get_active_game_id");
     setActiveGameId(active);
   }
 
@@ -583,25 +604,44 @@ function App() {
     }
   }
 
-  async function refresh() {
+  /**
+   * skipOverlayNotify: 收到悬浮窗通知而触发的刷新不再反向通知悬浮窗。
+   * 否则主窗口通知 → 悬浮窗（Any 监听器连定向事件也收到）→ 主窗口再通知 → 死循环。
+   */
+  async function refresh(skipOverlayNotify = false) {
+    const version = ++refreshRevision.current;
     try {
+      const active = await invoke<string>("get_active_game_id");
       const path = await invoke<string>("get_mods_path");
-      setModsPath(path);
-      if (path) {
-        const gs = await invoke<CharacterGroup[]>("scan");
-        setGroups(gs);
-        // 启动停留在角色一览，不自动进入任何角色
-      } else {
-        setGroups([]);
-        setSelectedChar("");
+      const [gs, ps, persist, single] = await Promise.all([
+        path ? invoke<CharacterGroup[]>("scan") : Promise.resolve([]),
+        invoke<Preset[]>("list_presets"),
+        invoke<{ enabled: boolean; cache_size: number }>("get_persist_status"),
+        invoke<boolean>("get_single_mode"),
+      ]);
+      const [currentActive, currentPath] = await Promise.all([
+        invoke<string>("get_active_game_id"),
+        invoke<string>("get_mods_path"),
+      ]);
+      if (version !== refreshRevision.current) return;
+      if (active !== currentActive || path !== currentPath || active !== activeGameRef.current) {
+        await refreshGames();
+        await refresh(skipOverlayNotify);
+        return;
       }
-      const ps = await invoke<Preset[]>("list_presets");
+      setModsPath(path);
+      setGroups(gs);
+      if (!path) setSelectedChar("");
       setPresets(ps);
-      const persist = await invoke<{ enabled: boolean; cache_size: number }>("get_persist_status");
       setPersistEnabled(persist.enabled);
       setPersistCacheSize(persist.cache_size);
+      setSingleMode(single);
+      localStorage.setItem("qaqm.singleMode", single ? "1" : "0");
+      if (!skipOverlayNotify) {
+        void invoke("notify_overlay_state_changed").catch((e) => console.warn("通知悬浮窗失败", e));
+      }
     } catch (e) {
-      setError(String(e));
+      if (version === refreshRevision.current) setError(String(e));
     }
   }
 
@@ -616,9 +656,40 @@ function App() {
     })();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+    const onRefresh = () => {
+      refreshRevision.current++;
+      void refreshGames().then(() => refresh(true)).catch((e) => { if (!cancelled) setError(String(e)); });
+    };
+    // 作用域限定监听：只接收显式发给主窗口的事件，悬浮窗发给自己的通知不会到达这里
+    void getCurrentWebviewWindow().listen("overlay-state-changed", onRefresh).then((un) => {
+      if (cancelled) un();
+      else unlisten = un;
+    }).catch((e) => { if (!cancelled) setError(String(e)); });
+    window.addEventListener("focus", onRefresh);
+    return () => {
+      cancelled = true;
+      unlisten?.();
+      window.removeEventListener("focus", onRefresh);
+    };
+  }, []);
+
   // 切换游戏后刷新启动配置（activeGameId 变更驱动）
   useEffect(() => {
-    refreshLaunchConfig();
+    let cancelled = false;
+    setLaunchConfig(null);
+    setLaunchMode("");
+    if (activeGameId) {
+      void invoke<LaunchConfig>("get_launch_config", { id: activeGameId }).then((cfg) => {
+        if (!cancelled && activeGameRef.current === activeGameId) {
+          setLaunchConfig(cfg);
+          setLaunchMode(cfg.launch_mode || "");
+        }
+      }).catch(() => {});
+    }
+    return () => { cancelled = true; };
   }, [activeGameId]);
 
   // 加载内置皮肤目录（QAQM 迁移数据）
@@ -743,6 +814,8 @@ function App() {
 
   async function handleSwitchGame(id: string) {
     setError("");
+    gamesRevision.current++;
+    refreshRevision.current++;
     try {
       await invoke("set_active_game", { id });
       setSelectedChar("");
@@ -752,7 +825,9 @@ function App() {
       // 先清空旧游戏数据，避免刷新间隙闪现上一游戏角色（配合 CharactersView 的 key 强制重挂载）
       setGroups([]);
       await refreshGames();
-      await refresh();
+      await refresh(true);
+      // 切换游戏影响悬浮窗的全部角色列表：显式主动刷新悬浮窗
+      void invoke("notify_overlay_state_changed").catch(() => {});
     } catch (e) {
       setError(String(e));
     }
@@ -1028,6 +1103,9 @@ function App() {
         >
           {modsPath || "未配置 Mods 目录（点击设置）"}
         </span>
+        <button onClick={() => invoke("open_overlay").catch((e) => setError(String(e)))}>
+          打开悬浮窗
+        </button>
       </header>
 
       {/* 底部居中浮层提示（自动关闭，悬停暂停） */}
@@ -1130,6 +1208,20 @@ function App() {
                 skinsCatalog={skinsCatalog}
                 modsPath={modsPath}
                 onToggle={handleToggle}
+                singleMode={singleMode}
+                onSingleModeChange={async (next) => {
+                  if (singleModeSaving.current) return;
+                  singleModeSaving.current = true;
+                  refreshRevision.current++;
+                  try {
+                    await invoke("set_single_mode", { enabled: next });
+                    await refresh();
+                  } catch (e) {
+                    setError(String(e));
+                  } finally {
+                    singleModeSaving.current = false;
+                  }
+                }}
                 onImport={handleImport}
                 onBack={() => setSelectedChar("")}
                 busy={busy}
@@ -2046,8 +2138,18 @@ function CharactersView({
       setCoverBusy("");
     }
   }
-  const [filter, setFilter] = useState<"all" | "hasMods" | "hasEnabled" | "hasUpdates">("all");
-  const [sortBy, setSortBy] = useState<"recent" | "mods" | "name" | "custom">("recent");
+  const [filter, setFilter] = useState<"all" | "hasMods" | "hasEnabled" | "hasUpdates">(() => {
+    const saved = localStorage.getItem("qaqm.characterFilter");
+    return saved === "hasMods" || saved === "hasEnabled" || saved === "hasUpdates" ? saved : "all";
+  });
+  const [sortBy, setSortBy] = useState<"recent" | "mods" | "name" | "custom">(() => {
+    const saved = localStorage.getItem("qaqm.characterSort");
+    return saved === "mods" || saved === "name" || saved === "custom" ? saved : "recent";
+  });
+  // 恢复「有更新」筛选时重新获取本次会话的更新结果。
+  useEffect(() => {
+    if (filter === "hasUpdates") onCheckUpdates();
+  }, []);
   // 角色自定义顺序（拖拽排序后保存到 config.json）
   const [charOrder, setCharOrder] = useState<string[]>([]);
   // 拖拽排序进行中：源卡片名 / 插入目标（卡片名 + 方向）
@@ -2518,6 +2620,7 @@ function CharactersView({
               className={`sort-chip ${filter === k ? "active" : ""}`}
               onClick={() => {
                 setFilter(k);
+                localStorage.setItem("qaqm.characterFilter", k);
                 if (k === "hasUpdates") onCheckUpdates();
               }}
               title={k === "hasUpdates" ? "显示检测到有新版本的市场安装 Mod" : undefined}
@@ -2540,7 +2643,10 @@ function CharactersView({
             <button
               key={k}
               className={`sort-chip ${sortBy === k ? "active" : ""}`}
-              onClick={() => setSortBy(k)}
+              onClick={() => {
+                setSortBy(k);
+                localStorage.setItem("qaqm.characterSort", k);
+              }}
               title={k === "custom" ? "按手动拖拽的顺序排列（此排序下可拖拽卡片调整顺序）" : undefined}
             >
               {label}
@@ -2709,6 +2815,8 @@ function CharacterDetailView({
   skinsCatalog,
   modsPath,
   onToggle,
+  singleMode,
+  onSingleModeChange,
   onImport,
   onBack,
   busy,
@@ -2724,6 +2832,8 @@ function CharacterDetailView({
   skinsCatalog: Record<string, { characters: any[] }>;
   modsPath: string;
   onToggle: (m: ModEntry) => Promise<void> | void;
+  singleMode: boolean;
+  onSingleModeChange: (next: boolean) => void;
   onImport: () => void;
   onBack: () => void;
   busy: boolean;
@@ -2763,26 +2873,6 @@ function CharacterDetailView({
       setMoveBusy(false);
     }
   }
-  const [singleMode, setSingleMode] = useState(
-    () => localStorage.getItem("qaqm.singleMode") === "1"
-  );
-
-  // 单选模式持久化到 config.json（localStorage 仅作首帧兜底，EBWebView 清缓存也不丢）
-  useEffect(() => {
-    invoke<boolean>("get_single_mode")
-      .then((v) => {
-        setSingleMode(v);
-        localStorage.setItem("qaqm.singleMode", v ? "1" : "0");
-      })
-      .catch(() => {});
-  }, []);
-
-  function handleSingleModeChange(next: boolean) {
-    setSingleMode(next);
-    localStorage.setItem("qaqm.singleMode", next ? "1" : "0");
-    invoke("set_single_mode", { enabled: next }).catch(() => {});
-  }
-
 
   // 备注 / 置顶 / 快捷键
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -3177,7 +3267,7 @@ function CharacterDetailView({
                 <input
                   type="checkbox"
                   checked={singleMode}
-                  onChange={(e) => handleSingleModeChange(e.target.checked)}
+                  onChange={(e) => onSingleModeChange(e.target.checked)}
                 />
                 <span className="slider" />
               </label>
@@ -5988,6 +6078,121 @@ function SettingsView({
 
         <button className="clear-cache" onClick={onClearPersist}>🧹 清空 Persist 缓存</button>
         </div>
+      </div>
+
+      <OverlayHotkeyCard />
+    </div>
+  );
+}
+
+// ===== 悬浮窗全局快捷键设置（独立小组件，自带状态与按键捕获） =====
+function OverlayHotkeyCard() {
+  const [hotkey, setHotkey] = useState("");
+  const [capturing, setCapturing] = useState(false);
+  const [preview, setPreview] = useState("");
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    invoke<string>("get_overlay_hotkey")
+      .then((v) => {
+        if (!cancelled) {
+          setHotkey(v);
+          if (v === "未注册") {
+            setStatus({ ok: false, text: "当前快捷键未注册（可能被其他程序占用或注册失败），请重新设置" });
+          }
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!capturing) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.repeat) return;
+      if (e.key === "Escape") {
+        setCapturing(false);
+        setPreview("");
+        return;
+      }
+      const mods: string[] = [];
+      if (e.ctrlKey) mods.push("Ctrl");
+      if (e.altKey) mods.push("Alt");
+      if (e.shiftKey) mods.push("Shift");
+      if (e.metaKey) mods.push("Win");
+      const key = e.key;
+      if (key === "Control" || key === "Alt" || key === "Shift" || key === "Meta") {
+        setPreview(mods.join("+"));
+        return;
+      }
+      let main = "";
+      if (/^[a-zA-Z]$/.test(key)) main = key.toUpperCase();
+      else if (/^[0-9]$/.test(key)) main = key;
+      else if (/^F(?:[1-9]|1[0-2])$/.test(key)) main = key;
+      else {
+        setStatus({ ok: false, text: "主键仅支持字母、数字或 F1~F12" });
+        setPreview("");
+        return;
+      }
+      const combo = [...mods, main].join("+");
+      setCapturing(false);
+      setPreview("");
+      setBusy(true);
+      setStatus(null);
+      // 先探测占用：占用时直接提示并保持原热键，不做注销/重注册
+      invoke<boolean>("check_hotkey_available", { hotkey: combo })
+        .then((available) => {
+          if (!available) {
+            setStatus({ ok: false, text: `「${combo}」已被其他程序占用，请换一个组合` });
+            return;
+          }
+          return invoke<string>("set_overlay_hotkey", { hotkey: combo }).then((display) => {
+            setHotkey(display);
+            setStatus({ ok: true, text: `已生效：${display}` });
+          });
+        })
+        .catch((err) => setStatus({ ok: false, text: String(err) }))
+        .finally(() => {
+          void getCurrentWebviewWindow().emitTo("overlay", "overlay-hotkey-changed")
+            .catch((e) => console.warn("通知悬浮窗更新快捷键失败", e));
+          setBusy(false);
+        });
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [capturing]);
+
+  return (
+    <div className="settings-section">
+      <h3 className="settings-section-title">悬浮窗</h3>
+      <div className="persist-card">
+        <div className="persist-row">
+          <span>呼出 / 隐藏悬浮窗（被其他程序占用时请换一个组合）</span>
+          <button
+            className="panel-btn"
+            disabled={busy}
+            onClick={() => {
+              setCapturing(true);
+              setStatus(null);
+              setPreview("");
+            }}
+          >
+            {capturing
+              ? preview
+                ? `${preview}+…（按 Esc 取消）`
+                : "请按下组合键…（Esc 取消）"
+              : `⌨ ${hotkey || "Alt+F"}`}
+          </button>
+        </div>
+        {status && <p className="persist-desc">{status.text}</p>}
+        <p className="persist-desc">
+          全局快捷键，游戏运行时也可呼出。切换 Mod 后是否立即生效取决于游戏及加载器的刷新机制。
+          独占全屏的游戏可能无法显示悬浮窗，建议使用无边框 / 窗口化模式。
+        </p>
       </div>
     </div>
   );
