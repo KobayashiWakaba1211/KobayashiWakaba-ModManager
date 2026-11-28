@@ -50,3 +50,9 @@ modpack-screenshot.png
 
 # 内部交接文档（含本机路径与逆向参考信息，不入库）
 HANDOVER.md
+
+# 独立打包构建目录
+src-tauri/target-test-package/
+
+# 未使用的旧加载器二进制资源（保留在本地，不入库）
+src-tauri/resources/neverness-loader/

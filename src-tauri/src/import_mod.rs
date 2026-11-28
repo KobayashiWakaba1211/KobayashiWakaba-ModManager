@@ -30,7 +30,7 @@ pub struct ImportCandidate {
 }
 
 /// 分析待导入的压缩包：提取名称、自动匹配角色
-pub fn analyze_imports(mods_path: &str, paths: &[String]) -> Vec<ImportCandidate> {
+pub fn analyze_imports(mods_path: &str, paths: &[String], game_id: &str) -> Vec<ImportCandidate> {
     // 已有角色目录
     let mut chars: Vec<String> = Vec::new();
     if let Ok(entries) = fs::read_dir(mods_path) {
@@ -86,11 +86,7 @@ pub fn analyze_imports(mods_path: &str, paths: &[String]) -> Vec<ImportCandidate
             }
 
             // 1b. 普通 mod 文件夹 → 按文件夹名匹配角色
-            let matched = chars
-                .iter()
-                .find(|c| dir_name.contains(c.as_str()))
-                .cloned()
-                .unwrap_or_default();
+            let matched = crate::character_match::guess(game_id, &chars, &dir_name);
             out.push(ImportCandidate {
                 path: p.clone(),
                 name: dir_name,
@@ -117,11 +113,7 @@ pub fn analyze_imports(mods_path: &str, paths: &[String]) -> Vec<ImportCandidate
         // 自动匹配：压缩包名 + 内部一级目录名 包含角色名
         let char_dir_hint = archive_top_dir(path, &ext).unwrap_or_default();
         let haystack = format!("{stem} {char_dir_hint}");
-        let matched = chars
-            .iter()
-            .find(|c| haystack.contains(c.as_str()))
-            .cloned()
-            .unwrap_or_default();
+        let matched = crate::character_match::guess(game_id, &chars, &haystack);
 
         let size = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
         out.push(ImportCandidate {

@@ -1,4 +1,5 @@
 mod characters;
+mod character_match;
 mod config;
 mod gallery;
 mod hotkeys;
@@ -8,6 +9,7 @@ mod launch;
 mod market;
 mod modpack;
 mod overlay;
+mod pak;
 mod persist;
 mod preset;
 mod scan;
@@ -17,6 +19,7 @@ mod update;
 use market::{cancel_market_download, market_categories, market_check_updates, market_comments, market_download, market_download_file, market_mod_detail, market_mods, market_search, market_top_subs};
 use tauri::Manager;
 
+use characters::BUILTIN_CHARACTERS;
 use config::{active_game, active_game_mut, load_config, save_config, AppConfig, Game};
 use scan::{clean_name, scan_mods, CharacterGroup};
 
@@ -27,6 +30,7 @@ const BUILTIN_GAMES: &[(&str, &str, &str)] = &[
     ("Star Rail Game", "starrail", "崩坏：星穹铁道"),
     ("Wuthering Waves", "wuthering", "鸣潮"),
     ("ZenlessZoneZero", "zenless", "绝区零"),
+    ("Neverness to Everness", "neverness", "异环"),
     // 原神：用户手动添加过（id 与已有记录一致，避免重复游戏）
     ("GenshinImpact", "GenshinImpact", "原神"),
 ];
@@ -656,6 +660,31 @@ fn set_launch_config(
     save_config(&cfg)
 }
 
+/// 异环导入前按文件名推断角色（中文、英文或拼音）。
+#[tauri::command]
+fn pak_guess_character(stem: String) -> String {
+    let mut names: Vec<String> = BUILTIN_CHARACTERS
+        .iter()
+        .find(|(id, _)| *id == "neverness")
+        .map(|(_, list)| list.iter().map(|s| s.to_string()).collect())
+        .unwrap_or_default();
+    let cfg = load_config();
+    if let Some(game) = cfg.games.iter().find(|g| g.id == "neverness") {
+        for name in &game.character_order {
+            if !names.iter().any(|existing| existing == name) {
+                names.push(name.clone());
+            }
+        }
+    }
+    character_match::guess("neverness", &names, &stem)
+}
+
+/// 启动用户指定的 Aurora 程序。
+#[tauri::command]
+fn launch_aurora(path: String) -> Result<(), String> {
+    launch::launch_aurora(&path)
+}
+
 /// 启动游戏（mode 为 None/空 = 用配置里的模式；"" 显式传 = 原版）
 #[tauri::command]
 fn launch_game(id: String, launch_mode: Option<String>) -> Result<(), String> {
@@ -897,7 +926,8 @@ fn analyze_imports(paths: Vec<String>) -> Result<Vec<import_mod::ImportCandidate
     if path.is_empty() {
         return Err("尚未配置 Mods 目录".into());
     }
-    Ok(import_mod::analyze_imports(&path, &paths))
+    let game_id = active_game(&cfg).map(|game| game.id.as_str()).unwrap_or("");
+    Ok(import_mod::analyze_imports(&path, &paths, game_id))
 }
 
 /// 批量导入项
@@ -1217,6 +1247,17 @@ fn set_mod_note(character: String, mod_name: String, note: String) -> Result<(),
     } else {
         game.mod_notes.insert(key, note);
     }
+    save_config(&cfg)
+}
+
+/// 保存异环 PAK Mod 备注，不写入 Mod 目录。
+#[tauri::command]
+fn set_pak_mod_note(active: String, disabled: String, character: String, mod_name: String, enabled: bool, note: String) -> Result<(), String> {
+    pak::validate_pak_entry(&active, &disabled, &character, &mod_name, enabled)?;
+    let mut cfg = load_config();
+    let game = cfg.games.iter_mut().find(|game| game.id == "neverness").ok_or("异环游戏配置不存在")?;
+    let key = format!("{character}/{mod_name}");
+    if note.trim().is_empty() { game.mod_notes.remove(&key); } else { game.mod_notes.insert(key, note); }
     save_config(&cfg)
 }
 
@@ -1718,6 +1759,23 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            pak::pak_active_path,
+            pak::pak_scan,
+            pak::pak_character_renames,
+            pak::pak_character_covers,
+            pak::pak_set_character_cover,
+            pak::pak_rename_character,
+            pak::pak_list_presets,
+            pak::pak_save_preset,
+            pak::pak_check_preset,
+            pak::pak_apply_preset,
+            pak::pak_delete_preset,
+            pak::pak_import,
+            pak::pak_toggle,
+            pak::pak_delete,
+            pak::pak_open_folder,
+            pak::pak_save_cover,
+            pak_guess_character,
             overlay::open_overlay,
             overlay::hide_overlay,
             overlay::notify_overlay_state_changed,
@@ -1768,6 +1826,7 @@ pub fn run() {
             get_character_order,
             set_character_order,
             set_mod_note,
+            set_pak_mod_note,
             toggle_mod_pin,
             rename_mod,
             get_mod_hotkeys,
@@ -1799,6 +1858,7 @@ pub fn run() {
             get_xxmi_launcher_path,
             set_xxmi_launcher_path,
             launch_game,
+            launch_aurora,
             hide_builtin_game,
             unhide_builtin_game,
             get_persist_status,

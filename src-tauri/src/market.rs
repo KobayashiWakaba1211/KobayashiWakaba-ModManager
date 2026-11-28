@@ -207,6 +207,7 @@ pub const GAME_GB_REGISTRY: &[(&str, u32, u32)] = &[
     ("starrail", 18366, 22832),   // 崩坏：星穹铁道
     ("wuthering", 20357, 29524),  // 鸣潮
     ("zenless", 19567, 30305),    // 绝区零
+    ("neverness", 23012, 37906),  // 异环：Skins 角色分类
     ("GenshinImpact", 8552, 18140), // 原神
 ];
 
@@ -214,6 +215,12 @@ pub const GAME_GB_REGISTRY: &[(&str, u32, u32)] = &[
 /// GameBanana 的 Mod/Categories 只返回角色分类，这些通用分类需要固化补上，否则市场里看不到武器等 Mod。
 /// 格式：(分类 id, 分类名, 条目数)
 pub const GAME_GENERIC_CATEGORIES: &[(&str, &[(u32, &str, u32)])] = &[
+    ("neverness", &[
+        (37898, "Other/Misc", 0),
+        (51624, "Scripts", 0),
+        (43029, "UI", 0),
+        (51623, "Vehicle", 0),
+    ]),
     ("endfield", &[
         (42777, "Arts Unit", 0),
         (42774, "Great Sword", 0),
@@ -635,6 +642,45 @@ pub async fn market_mod_detail(mod_id: u32) -> Result<MarketModDetail, String> {
 /// 下载任务取消标志注册表（taskId → 取消标志）
 pub struct CancelRegistry(pub Mutex<HashMap<String, Arc<AtomicBool>>>);
 
+struct DownloadRegistration<'a> {
+    registry: &'a CancelRegistry,
+    task_id: String,
+    flag: Arc<AtomicBool>,
+}
+
+impl<'a> DownloadRegistration<'a> {
+    fn new(registry: &'a CancelRegistry, task_id: &str) -> Result<Self, String> {
+        let flag = Arc::new(AtomicBool::new(false));
+        let mut tasks = registry.0.lock().map_err(|e| e.to_string())?;
+        if tasks.contains_key(task_id) { return Err("该下载任务已在进行中".into()); }
+        tasks.insert(task_id.to_string(), flag.clone());
+        Ok(Self { registry, task_id: task_id.to_string(), flag })
+    }
+}
+
+impl Drop for DownloadRegistration<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut tasks) = self.registry.0.lock() { tasks.remove(&self.task_id); }
+    }
+}
+
+#[cfg(test)]
+mod download_cleanup_tests {
+    use super::*;
+
+    #[test]
+    fn registration_is_removed_on_scope_exit_and_rejects_duplicates() -> Result<(), String> {
+        let registry = CancelRegistry(Mutex::new(HashMap::new()));
+        {
+            let _registration = DownloadRegistration::new(&registry, "one")?;
+            assert!(DownloadRegistration::new(&registry, "one").is_err());
+            assert!(registry.0.lock().map_err(|e| e.to_string())?.contains_key("one"));
+        }
+        assert!(registry.0.lock().map_err(|e| e.to_string())?.is_empty());
+        Ok(())
+    }
+}
+
 /// 取消一个下载任务（设置取消标志，下载循环检测到后中断并清理）
 #[tauri::command]
 pub fn cancel_market_download(
@@ -668,7 +714,15 @@ pub async fn market_download(
     task_id: String,
     gb_mod_id: u32,
     page_url: String,
+    pak_disabled: Option<String>,
 ) -> Result<String, String> {
+    let is_pak = pak_disabled.is_some();
+    if !is_pak && crate::config::load_config().active_game_id == "neverness" {
+        return Err("异环 Mod 必须使用 PAK 安装流程".into());
+    }
+    if is_pak && !["zip", "7z", "rar"].iter().any(|ext| std::path::Path::new(&filename).extension().is_some_and(|value| value.eq_ignore_ascii_case(ext))) {
+        return Err("异环市场安装支持 ZIP、7z 和 RAR 压缩包".into());
+    }
     let filename = sanitize_filename(&filename);
     if filename.is_empty() {
         return Err("无效的文件名".into());
@@ -688,12 +742,8 @@ pub async fn market_download(
     };
 
     // 注册取消标志（任务结束移除）
-    let cancel = Arc::new(AtomicBool::new(false));
-    state
-        .0
-        .lock()
-        .map_err(|e| e.to_string())?
-        .insert(task_id.clone(), cancel.clone());
+    let registration = DownloadRegistration::new(&state, &task_id)?;
+    let cancel = &registration.flag;
 
     // 下载到临时文件
     let client = reqwest::Client::builder()
@@ -712,15 +762,9 @@ pub async fn market_download(
     }
     let total = resp.content_length();
 
-    let tmp_path = std::env::temp_dir().join(format!(
-        "efmi-dl-{}-{}-{filename}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(0)
-    ));
-    let mut file = std::fs::File::create(&tmp_path).map_err(|e| format!("创建临时文件失败: {e}"))?;
+    let temp_dir = tempfile::Builder::new().prefix("efmi-dl-").tempdir().map_err(|e| format!("创建临时目录失败: {e}"))?;
+    let tmp_path = temp_dir.path().join(&filename);
+    let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&tmp_path).map_err(|e| format!("创建临时文件失败: {e}"))?;
     let mut downloaded: u64 = 0;
     let mut resp = resp;
     let mut cancelled = false;
@@ -744,12 +788,6 @@ pub async fn market_download(
             Ok(Err(e)) => {
                 let err = format!("下载数据失败: {e}");
                 drop(file);
-                let _ = std::fs::remove_file(&tmp_path);
-                state
-                    .0
-                    .lock()
-                    .map_err(|e| e.to_string())?
-                    .remove(&task_id);
                 return Err(err);
             }
             Ok(Ok(None)) => break, // 下载完成
@@ -773,44 +811,45 @@ pub async fn market_download(
         );
     }
     drop(file);
-    state
-        .0
-        .lock()
-        .map_err(|e| e.to_string())?
-        .remove(&task_id);
-
     if cancelled {
-        let _ = std::fs::remove_file(&tmp_path);
         return Err("下载已取消".into());
     }
 
     if downloaded == 0 {
-        let _ = std::fs::remove_file(&tmp_path);
         return Err("下载内容为空".into());
     }
 
     // 复用导入逻辑：解压安装到 mods/<角色>/<Mod名>
-    let result = crate::import_mod::import_mod_named(&mods_path, &tmp_path.to_string_lossy(), &character, &mod_name);
-    let _ = std::fs::remove_file(&tmp_path);
+    let result = if let Some(ref disabled) = pak_disabled {
+        crate::pak::pak_import(mods_path.clone(), disabled.clone(), tmp_path.to_string_lossy().into_owned(), character.clone(), mod_name.clone())
+            .map(|()| mod_name.clone())
+    } else {
+        crate::import_mod::import_mod_named(&mods_path, &tmp_path.to_string_lossy(), &character, &mod_name)
+    };
     let installed = result?;
-
     // 尽力而为：把下载页预览图保存为 mod 封面（失败不影响安装结果）
-    if let Some(cover_url) = cover_url {
-        if !cover_url.trim().is_empty() {
+    if let Some(cover_url) = cover_url.filter(|url| !url.trim().is_empty()) {
+        {
             let mod_dir = std::path::Path::new(&mods_path).join(&character).join(&installed);
-            if let Err(e) = save_mod_cover_image(&cover_url, &mod_dir).await {
+            if let Err(e) = save_mod_cover_image(&cover_url, &mod_dir, pak_disabled.as_deref().map(|disabled| (mods_path.as_str(), disabled, character.as_str(), installed.as_str()))).await {
                 let _ = app.emit(
                     "market-dl-progress",
                     serde_json::json!({ "filename": format!("{installed} 封面"), "downloaded": 0, "total": 0, "cover_error": e }),
                 );
             }
         }
+    } else {
+        let _ = app.emit(
+            "market-dl-progress",
+            serde_json::json!({ "filename": format!("{installed} 封面"), "downloaded": 0, "total": 0, "cover_error": "市场页面没有可用的预览图片" }),
+        );
     }
 
-    // 记录安装来源（更新检测用）：写入当前激活游戏的 market_sources
+    // 记录安装来源（更新检测用）：异环安装固定写入异环，避免下载期间切换游戏导致归属错误。
     {
         let mut cfg = crate::config::load_config();
-        if let Some(game) = cfg.games.iter_mut().find(|g| g.id == cfg.active_game_id) {
+        let game_id = if is_pak { "neverness".to_string() } else { cfg.active_game_id.clone() };
+        if let Some(game) = cfg.games.iter_mut().find(|g| g.id == game_id) {
             let rel_path = format!("{character}/{installed}");
             game.market_sources.insert(
                 rel_path,
@@ -823,7 +862,11 @@ pub async fn market_download(
                         .unwrap_or(0)),
                 },
             );
-            let _ = crate::config::save_config(&cfg);
+            if let Err(e) = crate::config::save_config(&cfg) {
+                return Err(format!("Mod 已安装到 {character}/{installed}，但市场来源记录保存失败，更新检测不可用：{e}"));
+            }
+        } else if is_pak {
+            return Err(format!("Mod 已安装到 {character}/{installed}，但未找到异环配置，无法记录市场来源"));
         }
     }
 
@@ -875,12 +918,8 @@ pub async fn market_download_file(
         .unwrap_or_else(|| filename.clone());
 
     // 注册取消标志
-    let cancel = Arc::new(AtomicBool::new(false));
-    state
-        .0
-        .lock()
-        .map_err(|e| e.to_string())?
-        .insert(task_id.clone(), cancel.clone());
+    let registration = DownloadRegistration::new(&state, &task_id)?;
+    let cancel = &registration.flag;
 
     // 下载（与 market_download 同款进度事件）
     let client = reqwest::Client::builder()
@@ -899,8 +938,7 @@ pub async fn market_download_file(
     }
     let total = resp.content_length();
 
-    let mut file =
-        std::fs::File::create(&target).map_err(|e| format!("创建文件失败: {e}"))?;
+    let mut file = tempfile::Builder::new().prefix(".market-download-").tempfile_in(&dir).map_err(|e| format!("创建临时文件失败: {e}"))?;
     let mut downloaded: u64 = 0;
     let mut resp = resp;
     let mut cancelled = false;
@@ -922,12 +960,6 @@ pub async fn market_download_file(
             Ok(Err(e)) => {
                 let err = format!("下载数据失败: {e}");
                 drop(file);
-                let _ = std::fs::remove_file(&target);
-                state
-                    .0
-                    .lock()
-                    .map_err(|e| e.to_string())?
-                    .remove(&task_id);
                 return Err(err);
             }
             Ok(Ok(None)) => break, // 下载完成
@@ -950,28 +982,29 @@ pub async fn market_download_file(
             }),
         );
     }
-    drop(file);
-    state
-        .0
-        .lock()
-        .map_err(|e| e.to_string())?
-        .remove(&task_id);
-
     if cancelled {
-        let _ = std::fs::remove_file(&target);
         return Err("下载已取消".into());
     }
-
     if downloaded == 0 {
-        let _ = std::fs::remove_file(&target);
         return Err("下载内容为空".into());
     }
-
+    file.flush().map_err(|e| format!("写入文件失败: {e}"))?;
+    loop {
+        match file.persist_noclobber(&target) {
+            Ok(_) => break,
+            Err(e) if e.error.kind() == std::io::ErrorKind::AlreadyExists => {
+                file = e.file;
+                target = dir.join(format!("{stem}({n}){ext}"));
+                n += 1;
+            }
+            Err(e) => return Err(format!("保存下载文件失败: {}", e.error)),
+        }
+    }
     Ok(target.to_string_lossy().to_string())
 }
 
 /// 下载图片并保存为 mod 目录的封面（按内容嗅探扩展名，仅支持 png/jpg）
-async fn save_mod_cover_image(cover_url: &str, mod_dir: &std::path::Path) -> Result<(), String> {
+async fn save_mod_cover_image(cover_url: &str, mod_dir: &std::path::Path, pak: Option<(&str, &str, &str, &str)>) -> Result<(), String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
@@ -1003,6 +1036,9 @@ async fn save_mod_cover_image(cover_url: &str, mod_dir: &std::path::Path) -> Res
     } else {
         return Err("不支持的封面格式（仅 png/jpg/webp）".into());
     };
+    if let Some((active, disabled, character, name)) = pak {
+        return crate::pak::save_market_cover(active, disabled, character, name, &bytes, ext);
+    }
     let target = mod_dir.join(format!("_cover.{ext}"));
     std::fs::write(&target, &bytes).map_err(|e| format!("写入封面失败: {e}"))?;
     Ok(())

@@ -80,7 +80,7 @@ pub fn delete_preset(name: &str) -> Result<(), String> {
     save_config(&cfg)
 }
 
-fn chrono_now() -> String {
+pub(crate) fn chrono_now() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)

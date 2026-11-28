@@ -49,6 +49,12 @@ pub struct AppConfig {
     /// 窗口高度（px，0 = 未记录，用默认 600）
     #[serde(default)]
     pub window_height: u32,
+    /// 异环双目录预设，与普通游戏预设分开保存。
+    #[serde(default)]
+    pub pak_presets: Vec<PakPreset>,
+    /// 异环内置角色重命名映射。
+    #[serde(default)]
+    pub pak_character_renames: std::collections::HashMap<String, String>,
     /// 悬浮窗全局快捷键
     pub overlay_hotkey: String,
     #[serde(skip)]
@@ -72,6 +78,8 @@ impl Default for AppConfig {
             xxmi_launcher_path: String::new(),
             window_width: 0,
             window_height: 0,
+            pak_presets: Vec::new(),
+            pak_character_renames: std::collections::HashMap::new(),
             overlay_hotkey: "Alt+F".to_string(),
             original: None,
         }
@@ -159,6 +167,22 @@ pub struct Preset {
     pub name: String,
     /// 预设里「启用」的 mod 相对路径列表（相对该游戏 mods_path，去掉 DISABLED_ 前缀后的干净路径）
     pub enabled_mods: Vec<String>,
+    pub created_at: String,
+}
+
+/// 异环预设中的单个 Mod 及其保存时的位置。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PakPresetEntry {
+    pub character: String,
+    pub name: String,
+    pub enabled: bool,
+}
+
+/// 异环双目录预设。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PakPreset {
+    pub name: String,
+    pub entries: Vec<PakPresetEntry>,
     pub created_at: String,
 }
 
@@ -330,6 +354,23 @@ pub fn save_config(cfg: &AppConfig) -> Result<(), String> {
     save_config_at(&config_path(), cfg)
 }
 
+/// 打开配置锁文件；Windows 下新文件可能被杀毒软件等短暂占用（拒绝访问/共享冲突），短暂重试。
+fn open_lock_file(dir: &Path) -> Result<fs::File, String> {
+    let path = dir.join("config.lock");
+    let mut last_error: Option<std::io::Error> = None;
+    for attempt in 0..5u32 {
+        match fs::OpenOptions::new().write(true).create(true).truncate(false).open(&path) {
+            Ok(file) => return Ok(file),
+            Err(e) if matches!(e.raw_os_error(), Some(5) | Some(32) | Some(33)) => {
+                last_error = Some(e);
+                std::thread::sleep(std::time::Duration::from_millis(50 * u64::from(attempt + 1)));
+            }
+            Err(e) => return Err(format!("打开配置锁失败: {e}")),
+        }
+    }
+    Err(format!("打开配置锁失败: {}", last_error.unwrap_or_else(|| std::io::Error::other("未知错误"))))
+}
+
 fn save_config_at(path: &Path, cfg: &AppConfig) -> Result<(), String> {
     let base = cfg
         .original
@@ -337,12 +378,7 @@ fn save_config_at(path: &Path, cfg: &AppConfig) -> Result<(), String> {
         .ok_or("配置未成功读取，拒绝覆盖原文件")?;
     let dir = path.parent().ok_or("配置路径无父目录")?;
     fs::create_dir_all(dir).map_err(|e| format!("创建配置目录失败: {e}"))?;
-    let lock = fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .open(dir.join("config.lock"))
-        .map_err(|e| format!("打开配置锁失败: {e}"))?;
+    let lock = open_lock_file(dir)?;
     lock.lock().map_err(|e| format!("锁定配置失败: {e}"))?;
     let (current_cfg, mut current_raw) = read_config(path)?;
     let current = serde_json::to_value(&current_cfg).map_err(|e| format!("序列化配置失败: {e}"))?;

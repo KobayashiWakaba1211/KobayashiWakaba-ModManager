@@ -25,6 +25,9 @@ pub fn importer_name(game_id: &str) -> &'static str {
 /// 该游戏支持的启动模式列表（复刻 QAQM 的 supportedLaunchModes）
 /// 原神用 GIML（加壳启动器）替代原来的 GIMI 注入模式。
 pub fn supported_modes(game_id: &str) -> Vec<String> {
+    if game_id == "neverness" {
+        return vec![];
+    }
     if game_id == "GenshinImpact" {
         return vec!["GIML".to_string(), "XXMI".to_string()];
     }
@@ -281,7 +284,7 @@ fn start_via_windows(exe: &str, args: &str) -> Result<(), String> {
         Err(e) if e.raw_os_error() == Some(740) => {
             #[cfg(windows)]
             {
-                start_via_shell_execute(exe, &argv, dir).map_err(|e2| format!("{e}；改用提权启动仍失败：{e2}"))
+                start_via_shell_execute(exe, &argv, dir, false).map_err(|e2| format!("{e}；改用提权启动仍失败：{e2}"))
             }
             #[cfg(not(windows))]
             {
@@ -290,6 +293,16 @@ fn start_via_windows(exe: &str, args: &str) -> Result<(), String> {
         }
         Err(e) => Err(format!("启动失败: {e}")),
     }
+}
+
+/// 启动用户选择的 Aurora 程序，不附加参数。
+pub fn launch_aurora(path: &str) -> Result<(), String> {
+    if path.trim().is_empty() { return Err("请先在系统设置中选择 Aurora Launcher 路径".into()); }
+    let executable = Path::new(path);
+    if !executable.is_absolute() || !executable.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("exe")) {
+        return Err("请选择有效的 exe 程序路径".into());
+    }
+    start_via_windows(path, "")
 }
 
 /// 把参数列表拼成 ShellExecute 用的命令行字符串（含空白的参数加引号）
@@ -309,7 +322,7 @@ fn join_shell_args(argv: &[String]) -> String {
 
 /// 通过 ShellExecuteExW 启动。目标需要提权时，系统会弹出 UAC 授权框。
 #[cfg(windows)]
-fn start_via_shell_execute(exe: &str, argv: &[String], dir: &Path) -> Result<(), String> {
+fn start_via_shell_execute(exe: &str, argv: &[String], dir: &Path, elevate: bool) -> Result<(), String> {
     use windows_sys::Win32::Foundation::{GetLastError, HWND};
     use windows_sys::Win32::UI::Shell::{ShellExecuteExW, SHELLEXECUTEINFOW};
 
@@ -336,6 +349,10 @@ fn start_via_shell_execute(exe: &str, argv: &[String], dir: &Path) -> Result<(),
     info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
     info.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
     info.hwnd = HWND::default();
+    let verb: Vec<u16> = "runas\0".encode_utf16().collect();
+    if elevate {
+        info.lpVerb = verb.as_ptr();
+    }
     info.lpFile = file.as_ptr() as *mut u16;
     info.lpParameters = if params.is_empty() {
         std::ptr::null_mut()
@@ -433,6 +450,17 @@ pub fn launch(cfg: &AppConfig, game: &Game, launch_mode: Option<&str>) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn aurora_rejects_missing_or_invalid_paths() {
+        assert!(launch_aurora("").is_err());
+        assert!(launch_aurora("relative.exe").is_err());
+        let dir = tempfile::tempdir().expect("temporary directory");
+        let text = dir.path().join("not-executable.txt");
+        fs::write(&text, b"test").expect("write test file");
+        assert!(launch_aurora(&text.to_string_lossy()).is_err());
+        assert!(launch_aurora(&dir.path().join("missing.exe").to_string_lossy()).is_err());
+    }
 
     #[test]
     fn importer_mapping() {

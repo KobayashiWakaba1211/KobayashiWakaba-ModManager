@@ -3,6 +3,12 @@
 
 /// game id -> 该游戏全部角色文件夹名
 pub const BUILTIN_CHARACTERS: &[(&str, &[&str])] = &[
+    ("neverness", &[
+        "NPC", "UI", "九原", "伊洛伊", "凛子", "功能", "卡厄斯", "哈尼娅",
+        "哈索尔", "埃德加", "大世界", "女主", "娜娜莉", "安魂曲", "小吱", "尼察",
+        "早雾", "武器", "沁红", "法蒂亚", "浔", "海月", "男主", "白藏", "真红",
+        "翳", "薄荷", "赤子", "赤音", "载具", "达芙迪尔", "阿尔法德", "阿德勒", "黑鸟",
+    ]),
     ("endfield", &[
         "NPC", "Other Misc", "UI", "伊冯", "余烬", "佩丽卡",
         "其他", "别礼", "功能", "卡契尔", "卡繆", "噗切娜",
@@ -87,7 +93,7 @@ pub fn builtin_names(game_id: &str) -> Option<&'static [&'static str]> {
 /// 在 mods_path 下按固化名单检查角色文件夹：存在则直接读取（保留），缺失则创建。
 /// 返回 (新建数, 已存在数)。路径不含 mods 或该游戏无固化名单时返回 (0, 0)。
 pub fn ensure_character_dirs(game_id: &str, mods_path: &str) -> Result<(usize, usize), String> {
-    if !crate::config::is_mods_path(mods_path) {
+    if game_id == "neverness" || !crate::config::is_mods_path(mods_path) {
         return Ok((0, 0));
     }
     let names = match builtin_names(game_id) {
@@ -122,6 +128,17 @@ mod tests {
             assert!(names.iter().all(|n| !n.is_empty()), "{id} 有空角色名");
         }
         assert!(builtin_names("unknown_game").is_none());
+    }
+
+    #[test]
+    fn neverness_names_do_not_create_xxmi_directories() {
+        let names = builtin_names("neverness").unwrap();
+        assert_eq!(names.len(), 34);
+        assert!(names.contains(&"赤子"));
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("Mods");
+        assert_eq!(ensure_character_dirs("neverness", &path.to_string_lossy()).unwrap(), (0, 0));
+        assert!(!path.exists());
     }
 
     #[test]

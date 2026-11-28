@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, confirm } from "@tauri-apps/plugin-dialog";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -187,6 +187,7 @@ function shortGameName(id: string): string {
       starrail: "星穹铁道",
       wuthering: "鸣潮",
       zenless: "绝区零",
+      neverness: "异环",
       GenshinImpact: "原神",
     } as Record<string, string>
   )[id] || "游戏";
@@ -208,6 +209,12 @@ function applyThemePref(pref: ThemePref) {
 function App() {
   const [games, setGames] = useState<Game[]>([]);
   const [activeGameId, setActiveGameId] = useState("");
+  const [showNevernessIntro, setShowNevernessIntro] = useState(false);
+  useEffect(() => {
+    if (activeGameId === "neverness" && localStorage.getItem("emm.neverness.intro_acknowledged") !== "1") setShowNevernessIntro(true);
+    else if (activeGameId !== "neverness") setShowNevernessIntro(false);
+  }, [activeGameId]);
+  const [pakDropped, setPakDropped] = useState<string[]>([]);
   const [modsPath, setModsPath] = useState("");
   const [groups, setGroups] = useState<CharacterGroup[]>([]);
   const [singleMode, setSingleMode] = useState(() => localStorage.getItem("qaqm.singleMode") === "1");
@@ -314,6 +321,16 @@ function App() {
   const [xxmiPath, setXxmiPath] = useState("");
   // 启动游戏（复刻 QAQM）：当前游戏的启动配置与临时选中的模式
   const [launchConfig, setLaunchConfig] = useState<LaunchConfig | null>(null);
+  const [pakDisabled, setPakDisabled] = useState(() => localStorage.getItem("emm.pak.disabled") || "");
+  const [pakRoot, setPakRoot] = useState(() => localStorage.getItem("emm.pak.root") || "");
+  const [pakActive, setPakActive] = useState("");
+  const [pakPathError, setPakPathError] = useState("");
+  useEffect(() => {
+    let current = true;
+    setPakActive(""); setPakPathError("");
+    if (activeGameId === "neverness" && pakRoot) invoke<string>("pak_active_path", { gameRoot: pakRoot }).then((path) => { if (current) setPakActive(path); }).catch((e) => { if (current) setPakPathError(String(e)); });
+    return () => { current = false; };
+  }, [activeGameId, pakRoot]);
   const [launchMode, setLaunchMode] = useState<string>("");
   const [launching, setLaunching] = useState(false);
   // 全局下载中心：进行中的下载任务（事件驱动，不持久化，退出程序即消失）
@@ -350,7 +367,8 @@ function App() {
       (ev) => {
         const p = ev.payload;
         const taskId = p.taskId;
-        if (p.cover_error || !taskId) return; // 封面事件 / 无任务 id 不入列表
+        if (p.cover_error) { setError(`Mod 已安装，但预览图未下载或保存成功：${p.cover_error}`); return; }
+        if (!taskId) return;
         setDlTasks((prev) => {
           const i = prev.findIndex((x) => x.id === taskId);
           if (i === -1) {
@@ -484,8 +502,13 @@ function App() {
     setLaunching(true);
     setError("");
     try {
-      await invoke("launch_game", { id: activeGameId, launchMode });
-      setMsg(launchMode ? `正在启动（${launchMode}）` : "正在原版启动游戏");
+      if (activeGameId === "neverness") {
+        await invoke("launch_aurora", { path: localStorage.getItem("emm.neverness.aurora_launcher") || "" });
+        setMsg("已请求启动 Aurora；游戏启动由 Aurora 负责");
+      } else {
+        await invoke("launch_game", { id: activeGameId, launchMode });
+        setMsg(launchMode ? `正在启动（${launchMode}）` : "正在原版启动游戏");
+      }
     } catch (e) {
       setError(`启动失败：${String(e)}`);
     } finally {
@@ -744,6 +767,9 @@ function App() {
             setDragActive(false);
             const paths = p.paths || [];
             if (paths.length > 0) {
+              if (activeGameId === "neverness") {
+                setNav("characters"); setPakDropped(paths); return;
+              }
               invoke<ImportCandidate[]>("analyze_imports", { paths })
                 .then((list) => {
                   if (list.length === 0) {
@@ -768,7 +794,7 @@ function App() {
       cancelled = true;
       if (unlisten) unlisten();
     };
-  }, []);
+  }, [activeGameId]);
 
   // 窗口尺寸：启动时恢复上次大小，否则用默认 1440x900 并居中
   useEffect(() => {
@@ -1093,15 +1119,13 @@ function App() {
           {games.find((g) => g.id === activeGameId)?.name || "未选择游戏"}
         </span>
         <span
-          className={`path-display ${modsPath ? "" : "path-missing"}`}
-          title={modsPath ? modsPath : "点击配置当前游戏的 Mods 目录"}
+          className={`path-display ${(activeGameId === "neverness" ? pakActive && pakDisabled && !pakPathError : modsPath) ? "" : "path-missing"}`}
+          title={activeGameId === "neverness" ? (pakPathError || (!pakActive ? "点击设置游戏根目录" : !pakDisabled ? "点击设置停用目录" : `生效目录：${pakActive}\n停用目录：${pakDisabled}`)) : (modsPath || "点击配置当前游戏的 Mods 目录")}
           onClick={() => {
-            if (!modsPath) {
-              setNav("settings");
-            }
+            if (activeGameId === "neverness" ? (!pakActive || !pakDisabled || !!pakPathError) : !modsPath) setNav("settings");
           }}
         >
-          {modsPath || "未配置 Mods 目录（点击设置）"}
+          {activeGameId === "neverness" ? (pakPathError ? "游戏根目录无效（点击设置）" : !pakActive ? "未配置游戏根目录（点击设置）" : !pakDisabled ? "未配置停用目录（点击设置）" : pakActive) : (modsPath || "未配置 Mods 目录（点击设置）")}
         </span>
         <button onClick={() => invoke("open_overlay").catch((e) => setError(String(e)))}>
           打开悬浮窗
@@ -1142,7 +1166,7 @@ function App() {
           </ul>
 
           {/* 启动面板（复刻 QAQM） */}
-          <div className="launch-panel">
+          {activeGameId === "neverness" ? <div className="launch-panel"><div className="launch-mode-label launch-mode-label-centered">启动异环MOD加载器</div><button className="launch-primary-btn" onClick={handleLaunch} disabled={launching}>{launching ? "启动中..." : "启动Aurora"}</button></div> : <div className="launch-panel">
             <div className="launch-mode-label">启动模式</div>
             <div className="launch-mode-buttons">
               {(launchConfig?.supported_modes ?? []).map((mode) => (
@@ -1173,7 +1197,7 @@ function App() {
                 <>{launchMode ? `🚀 启动 ${shortGameName(activeGameId)} (${launchMode})` : `🚀 原版启动 ${shortGameName(activeGameId)}`}</>
               )}
             </button>
-          </div>
+          </div>}
         </nav>
 
         {/* 右侧内容 */}
@@ -1187,7 +1211,9 @@ function App() {
               </div>
             </div>
           ) : nav === "characters" ? (
-            !modsPath ? (
+            activeGameId === "neverness" ? (
+              <NevernessCharactersView skinsCatalog={skinsCatalog} cardSize={cardSize} active={pakActive} disabled={pakDisabled} pathError={pakPathError} onSettings={() => setNav("settings")} dropped={pakDropped} onDropHandled={() => setPakDropped([])} updateKeys={updateKeys} checkingUpdates={checkingUpdates} onCheckUpdates={checkModUpdates} />
+            ) : !modsPath ? (
               <div className="empty">
                 <div>
                   <p>尚未配置 Mods 目录</p>
@@ -1256,6 +1282,9 @@ function App() {
               gameId={activeGameId}
               groups={groups}
               modsPath={modsPath}
+              pakActive={pakActive}
+              pakDisabled={pakDisabled}
+              pakPathError={pakPathError}
               initialChar={selectedChar}
               heroScale={marketHeroScale}
               cardSize={marketCardSize}
@@ -1272,6 +1301,8 @@ function App() {
               onRegisterUrl={registerTaskUrl}
               onCancelTask={cancelDlTask}
             />
+          ) : nav === "presets" && activeGameId === "neverness" ? (
+            <PakPresetsView active={pakActive} disabled={pakDisabled} pathError={pakPathError} onError={setError} />
           ) : nav === "presets" ? (
             <PresetsView
               presets={presets}
@@ -1313,6 +1344,13 @@ function App() {
               downloadDir={downloadDir}
               onChangeDownloadDir={handleChangeDownloadDir}
               activeGameName={games.find((g) => g.id === activeGameId)?.name || activeGameId}
+              activeGameId={activeGameId}
+              pakActive={pakActive}
+              pakRoot={pakRoot}
+              onPakRootChange={(path) => { localStorage.setItem("emm.pak.root", path); setPakRoot(path); }}
+              pakDisabled={pakDisabled}
+              pakPathError={pakPathError}
+              onPakDisabledChange={(path) => { localStorage.setItem("emm.pak.disabled", path); setPakDisabled(path); }}
               activeModsPath={modsPath}
               onChangeModsPath={handleChangeModsPath}
               xxmiPath={xxmiPath}
@@ -1332,6 +1370,23 @@ function App() {
         onCancel={cancelDlTask}
         onRemove={removeDlTask}
       />
+
+      {showNevernessIntro && activeGameId === "neverness" && (
+        <div className="modal-overlay neverness-intro-overlay">
+          <div className="confirm-modal neverness-intro" role="dialog" aria-modal="true" aria-labelledby="neverness-intro-title">
+            <h3 id="neverness-intro-title" className="confirm-title">异环 Mod 使用须知</h3>
+            <p className="confirm-text"><strong>使用 Mod 可能违反游戏规则，存在游戏账号被处罚或封禁的风险。</strong>请自行了解相关规则并谨慎使用。</p>
+            <p className="confirm-text">本应用仅负责管理 Mod 文件，不负责加载 Mod 或启动游戏。使用时需要单独下载并运行 Aurora Launcher，再由 Aurora 启动游戏。</p>
+            <p className="confirm-text"><a className="aurora-download-link" href="https://gamebanana.com/tools/22803" onClick={(event) => { event.preventDefault(); void openUrl("https://gamebanana.com/tools/22803").catch((error) => setError(`打开下载页面失败：${String(error)}`)); }}>下载 Aurora Launcher</a></p>
+            <p className="confirm-text">接下来请在系统设置中配置异环游戏根目录、Mod 停用目录和 Aurora Launcher 程序路径。</p>
+            <div className="confirm-actions"><button className="confirm-primary" onClick={() => {
+              try { localStorage.setItem("emm.neverness.intro_acknowledged", "1"); }
+              catch { setError("无法保存提示确认状态，下次进入时可能再次提示。"); }
+              setShowNevernessIntro(false); setNav("settings");
+            }}>我已了解，前往设置</button></div>
+          </div>
+        </div>
+      )}
 
       {/* 退出确认（二级菜单） */}
       {confirmExit && (
@@ -1645,12 +1700,16 @@ function ImportDialog({
   busy,
   onCancel,
   onConfirm,
+  pakMode = false,
+  error = "",
 }: {
   items: ImportCandidate[];
   characters: string[];
   busy: boolean;
   onCancel: () => void;
   onConfirm: (list: { path: string; character: string; name: string }[]) => void;
+  pakMode?: boolean;
+  error?: string;
 }) {
   const [rows, setRows] = useState(
     items.map((it) => ({
@@ -1687,9 +1746,8 @@ function ImportDialog({
         </div>
 
         <div className="modal-tip">
-          已识别 <strong>{rows.length}</strong> 项，
-          <span className="ok-text">{matchedCount} 项自动匹配角色</span>。
-          绿色为已匹配，橙色为未匹配，请确认后安装。
+          {pakMode ? <>请选择安装位置。支持 ZIP、7z、RAR 或已解压的 PAK Mod 文件夹；将复制到生效目录，不修改来源或覆盖同名 Mod。</> : <>已识别 <strong>{rows.length}</strong> 项，<span className="ok-text">{matchedCount} 项自动匹配角色</span>。绿色为已匹配，橙色为未匹配，请确认后安装。</>}
+          {error && <p role="alert">{error}</p>}
         </div>
 
         <div className="import-head">
@@ -2088,6 +2146,7 @@ function CharactersView({
   updateKeys,
   checkingUpdates,
   onCheckUpdates,
+  pakMode = false,
 }: {
   groups: CharacterGroup[];
   gameId: string;
@@ -2107,6 +2166,7 @@ function CharactersView({
   checkingUpdates: boolean;
   /** 触发更新检测 */
   onCheckUpdates: (force?: boolean) => void;
+  pakMode?: boolean;
 }) {
   const [editing, setEditing] = useState<string>("");
   const [editValue, setEditValue] = useState("");
@@ -2126,10 +2186,11 @@ function CharactersView({
       });
       if (typeof picked !== "string") return;
       setCoverBusy(charName);
-      await invoke("set_character_cover", {
-        character: charName,
-        imagePath: picked,
-      });
+      if (pakMode) {
+        await invoke("pak_set_character_cover", { active: modsPath, disabled: localStorage.getItem("emm.pak.disabled") || "", character: charName, imagePath: picked });
+      } else {
+        await invoke("set_character_cover", { character: charName, imagePath: picked });
+      }
       setCoverBust((prev) => ({ ...prev, [charName]: Date.now() }));
       onRefreshAll();
     } catch (e) {
@@ -2140,7 +2201,7 @@ function CharactersView({
   }
   const [filter, setFilter] = useState<"all" | "hasMods" | "hasEnabled" | "hasUpdates">(() => {
     const saved = localStorage.getItem("qaqm.characterFilter");
-    return saved === "hasMods" || saved === "hasEnabled" || saved === "hasUpdates" ? saved : "all";
+    return saved === "hasMods" || saved === "hasEnabled" || (!pakMode && saved === "hasUpdates") ? saved as "hasMods" | "hasEnabled" | "hasUpdates" : "all";
   });
   const [sortBy, setSortBy] = useState<"recent" | "mods" | "name" | "custom">(() => {
     const saved = localStorage.getItem("qaqm.characterSort");
@@ -2572,10 +2633,11 @@ function CharactersView({
           </div>
           <div className="char-header-actions">
             <button className="panel-btn" onClick={onPickArchives}>
-              📦 批量导入
+              {pakMode ? "📦 导入文件夹" : "📦 批量导入"}
             </button>
             <button
               className="panel-btn"
+              disabled={pakMode}
               onClick={onOpenPack}
               title="导入带 Mods/角色/具体Mod 结构的整合包"
             >
@@ -2617,6 +2679,7 @@ function CharactersView({
           ).map(([k, label]) => (
             <button
               key={k}
+              disabled={pakMode && k === "hasUpdates"}
               className={`sort-chip ${filter === k ? "active" : ""}`}
               onClick={() => {
                 setFilter(k);
@@ -2728,6 +2791,7 @@ function CharactersView({
                   ) : null;
                 })()}
                 <Cover
+                  key={`${g.name}-${g.cover}-${coverBust[g.name] || 0}`}
                   basePath={modsPath}
                   character={g.name}
                   cover={g.cover}
@@ -2737,6 +2801,7 @@ function CharactersView({
 
                 {/* 更换封面按钮（悬浮显示） */}
                 <button
+                  disabled={!!coverBusy}
                   className="cover-edit-btn"
                   title="更换角色封面（自动保存为 _cover.png）"
                   onClick={(e) => {
@@ -4206,6 +4271,7 @@ const GAME_NAMES: Record<string, string> = {
   starrail: "崩坏：星穹铁道",
   wuthering: "鸣潮",
   zenless: "绝区零",
+  neverness: "异环",
 };
 /** 全局下载中心的一个下载任务（终态保留在列表里，退出程序即清空） */
 type DlTaskStatus = "active" | "done" | "failed" | "cancelled";
@@ -4226,6 +4292,9 @@ function MarketView({
   gameId,
   groups,
   modsPath,
+  pakActive,
+  pakDisabled,
+  pakPathError,
   initialChar,
   heroScale,
   cardSize,
@@ -4241,6 +4310,9 @@ function MarketView({
   gameId: string;
   groups: CharacterGroup[];
   modsPath: string;
+  pakActive: string;
+  pakDisabled: string;
+  pakPathError: string;
   initialChar: string;
   /** 中央推荐大卡片的显示大小（占容器宽度百分比，等比缩放） */
   heroScale: number;
@@ -4276,6 +4348,7 @@ function MarketView({
   const [shot, setShot] = useState(0); // 详情面板当前截图下标
   // 下载按钮的二级菜单（当前展开的文件 id；null = 关闭）
   const [dlMenu, setDlMenu] = useState<number | null>(null);
+  const [pakInstall, setPakInstall] = useState<{ file: MarketFile; detail: MarketModDetail; character: string } | null>(null);
   // IMM 复刻：首页 TopSubs 轮播
   const [topSubs, setTopSubs] = useState<MarketTopSub[]>([]);
   const [topSubIndex, setTopSubIndex] = useState(0);
@@ -4466,17 +4539,28 @@ function MarketView({
     return local ? local.name : gbCat;
   }
 
-  async function handleDownload(f: MarketFile, d: MarketModDetail) {
-    const char = targetCharacter(d);
+  async function preparePakInstall(f: MarketFile, d: MarketModDetail) {
+    if (!/\.(zip|7z|rar)$/i.test(f.filename)) {
+      setError("异环市场安装支持 ZIP、7z 和 RAR 压缩包");
+      return;
+    }
+    let character = "";
+    try { character = await invoke<string>("pak_guess_character", { stem: `${d.name} ${f.filename}` }); } catch { /* 可手动选择 */ }
+    setPakInstall({ file: f, detail: d, character });
+  }
+
+  async function handleDownload(f: MarketFile, d: MarketModDetail, pakTarget?: { character: string; name: string }) {
+    const char = pakTarget?.character || targetCharacter(d);
     const taskId = String(f.id);
     onRegisterUrl(taskId, d.url);
     try {
       const installed = await invoke<string>("market_download", {
-        modsPath,
+        modsPath: pakTarget ? pakActive : modsPath,
+        pakDisabled: pakTarget ? pakDisabled : null,
         downloadUrl: f.download_url,
         filename: f.filename,
         character: char,
-        modName: d.name,
+        modName: pakTarget?.name || d.name,
         // 安装时把下载页预览图一并存为 mod 封面
         coverUrl: d.images[0] || "",
         taskId,
@@ -4490,7 +4574,7 @@ function MarketView({
         taskId,
         "done",
         `已安装到 ${installed}`,
-        `${modsPath}/${char}/${installed}`,
+        `${pakTarget ? pakActive : modsPath}/${installed}`,
       );
     } catch (e) {
       const msg = String(e);
@@ -4541,6 +4625,7 @@ function MarketView({
           <h2>🛒 Mod 市场</h2>
           <span className="char-subtitle">
             来自 GameBanana 的 {GAME_NAMES[gameId] || gameId} Mod 在线检索
+            {gameId === "neverness" && "（支持 ZIP / 7z / RAR PAK 安装）"}
           </span>
           <div className="char-header-actions">
             <button
@@ -4862,11 +4947,12 @@ function MarketView({
                           <div className="market-dl-menu">
                             <button
                               className="market-dl-menu-item"
-                              disabled={!modsPath}
-                              title={modsPath ? "下载并安装到对应角色目录" : "尚未配置 Mods 目录"}
+                              disabled={gameId === "neverness" ? !pakActive || !pakDisabled || !!pakPathError : !modsPath}
+                              title={gameId === "neverness" ? "选择角色后下载安装 PAK Mod" : modsPath ? "下载并安装到对应角色目录" : "尚未配置 Mods 目录"}
                               onClick={() => {
                                 setDlMenu(null);
-                                handleDownload(f, detail);
+                                if (gameId === "neverness") void preparePakInstall(f, detail);
+                                else void handleDownload(f, detail);
                               }}
                             >
                               📦 下载并安装
@@ -4926,6 +5012,20 @@ function MarketView({
           </div>
         </div>
       )}
+      {pakInstall && <ImportDialog
+        items={[{ path: pakInstall.file.filename, name: pakInstall.detail.name.replace(/[\\/:*?"<>|]/g, "_").replace(/[. ]+$/, "") || "Mod", character: pakInstall.character, size: 0 }]}
+        characters={Array.from(new Set([...(BUILTIN_COVERS.neverness || []), "赤子", ...groups.map((g) => g.name)]))}
+        busy={false}
+        pakMode
+        onCancel={() => setPakInstall(null)}
+        onConfirm={(items) => {
+          const item = items[0];
+          if (!item) return;
+          const { file, detail } = pakInstall;
+          setPakInstall(null);
+          void handleDownload(file, detail, { character: item.character, name: item.name });
+        }}
+      />}
     </div>
   );
 }
@@ -4976,6 +5076,50 @@ function PresetsView({
       </div>
     </div>
   );
+}
+
+type PakPreset = { name: string; created_at: string; entries: { character: string; name: string; enabled: boolean }[] };
+type PakPresetResult = { moved: number; missing: string[]; error: string | null };
+
+function PakPresetsView({ active, disabled, pathError, onError }: { active: string; disabled: string; pathError: string; onError: (message: string) => void }) {
+  const [items, setItems] = useState<PakPreset[]>([]);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = async () => setItems(await invoke<PakPreset[]>("pak_list_presets"));
+  useEffect(() => { void load().catch((e) => onError(String(e))); }, []);
+  async function run(action: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true);
+    try { await action(); } catch (e) { onError(String(e)); } finally { setBusy(false); }
+  }
+  function checkPaths() {
+    if (!active || !disabled || pathError) throw new Error(pathError || "请先在系统设置中配置异环生效目录和停用目录");
+  }
+  return <div className="view">
+    <div className="view-header"><div><h2>预设配置</h2><div className="subtitle">保存启用和停用目录中的 Mod 状态；应用时只调整预设中记录的 Mod。</div></div></div>
+    <div className="preset-form"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="预设名称" />
+      <button className="primary" disabled={busy} onClick={() => void run(async () => {
+        checkPaths(); if (!name.trim()) throw new Error("请输入预设名称");
+        await invoke("pak_save_preset", { active, disabled, name: name.trim() }); setName(""); await load();
+      })}>保存当前方案</button></div>
+    <div className="preset-list">{items.map((p) => <div key={p.name} className="preset-card">
+      <div className="preset-info"><div className="preset-title">{p.name}</div><div className="preset-sub">启用 {p.entries.filter((e) => e.enabled).length} 个 · 停用 {p.entries.filter((e) => !e.enabled).length} 个 · {p.created_at}</div></div>
+      <div className="preset-actions"><button className="primary" disabled={busy} onClick={() => void run(async () => {
+        checkPaths();
+        const check = await invoke<{ missing: string[]; conflicts: string[] }>("pak_check_preset", { active, disabled, name: p.name });
+        if (check.missing.length) window.alert(`以下 Mod 已缺失，应用时将跳过：\n${check.missing.join("\n")}`);
+        if (check.conflicts.length && !window.confirm(`以下 Mod 在启用和停用目录均存在：\n${check.conflicts.join("\n")}\n\n继续应用将跳过这些冲突项，不覆盖或删除文件。是否继续？`)) return;
+        const result = await invoke<PakPresetResult>("pak_apply_preset", { active, disabled, name: p.name, skipConflicts: check.conflicts });
+        const newlyMissing = result.missing.filter((item) => !check.missing.includes(item));
+        const missing = newlyMissing.length ? `\n应用期间新发现缺失，已跳过：\n${newlyMissing.join("\n")}` : "";
+        if (result.error) onError(`应用已停止：${result.error}\n已移动 ${result.moved} 个 Mod，之前的移动不会自动回滚。${missing}`);
+        else if (missing) window.alert(`预设已应用，已移动 ${result.moved} 个 Mod。${missing}`);
+      })}>应用</button><button className="danger" disabled={busy} onClick={() => void run(async () => {
+        if (!window.confirm(`确定删除预设“${p.name}”？不会删除 Mod 文件。`)) return;
+        await invoke("pak_delete_preset", { name: p.name }); await load();
+      })}>删除</button></div></div>)}
+      {items.length === 0 && <div className="empty-hint">暂无预设，保存后可恢复当前 Mod 目录状态</div>}</div>
+  </div>;
 }
 
 // ===== 切换游戏视图 =====
@@ -5158,8 +5302,8 @@ function GamesView({
         <div>
           <div className="games-hint-title">切换游戏后到系统设置配置 Mods 路径</div>
           <div className="games-hint-text">
-            先切换到要玩的游戏，再到「系统设置 → 当前游戏」里选择该游戏目录下的 <strong>Mods</strong> 文件夹，
-            例如 <code>XXMI MODS\EndField Game\Mods</code>
+            XXMI 游戏请在「系统设置 → 当前游戏」中配置 <strong>Mods</strong> 文件夹，
+            例如 <code>XXMI MODS\EndField Game\Mods</code>；异环管理正在接入。
           </div>
         </div>
       </div>
@@ -5334,6 +5478,7 @@ const GAME_COVERS: Record<string, string> = {
   starrail: "/games/starrail.png",
   wuthering: "/games/wuthering.png",
   zenless: "/games/zenless.png",
+  neverness: "/games/neverness.webp",
 };
 
 function GameCover({
@@ -5836,6 +5981,13 @@ function SettingsView({
   downloadDir,
   onChangeDownloadDir,
   activeGameName,
+  activeGameId,
+  pakActive,
+  pakRoot,
+  onPakRootChange,
+  pakDisabled,
+  pakPathError,
+  onPakDisabledChange,
   activeModsPath,
   onChangeModsPath,
   xxmiPath,
@@ -5851,6 +6003,13 @@ function SettingsView({
   downloadDir: string;
   onChangeDownloadDir: () => void;
   activeGameName: string;
+  activeGameId: string;
+  pakActive: string;
+  pakRoot: string;
+  onPakRootChange: (path: string) => void;
+  pakDisabled: string;
+  pakPathError: string;
+  onPakDisabledChange: (path: string) => void;
   activeModsPath: string;
   onChangeModsPath: () => void;
   xxmiPath: string;
@@ -5866,6 +6025,31 @@ function SettingsView({
 }) {
   // 手动输入框的本地值（失焦/回车时才提交，避免每敲一下都重建）
   const [cacheInput, setCacheInput] = useState(String(persistCacheSize));
+  const [auroraPath, setAuroraPath] = useState(() => localStorage.getItem("emm.neverness.aurora_launcher") || "");
+  const [auroraError, setAuroraError] = useState("");
+  async function chooseAuroraLauncher() {
+    try {
+      const picked = await open({ multiple: false, filters: [{ name: "程序", extensions: ["exe"] }] });
+      if (typeof picked !== "string") return;
+      const filename = picked.split(/[\\/]/).pop() || "";
+      if (!filename.toLowerCase().endsWith(".exe")) {
+        setAuroraError("请选择 .exe 程序文件");
+        return;
+      }
+      if (filename.toLowerCase() !== "aurora.exe") {
+        const accepted = await confirm(`所选文件“${filename}”不是 Aurora.exe，可能不是 Aurora Launcher。是否仍要使用此文件？`, {
+          title: "确认启动器路径",
+          kind: "warning",
+          okLabel: "仍然使用",
+          cancelLabel: "取消",
+        });
+        if (!accepted) return;
+      }
+      localStorage.setItem("emm.neverness.aurora_launcher", picked);
+      setAuroraPath(picked);
+      setAuroraError("");
+    } catch (error) { setAuroraError(`保存 Aurora Launcher 路径失败：${String(error)}`); }
+  }
 
   // 启动设置编辑值（复刻 QAQM：附加启动参数）
   const [launchArgs, setLaunchArgs] = useState("");
@@ -5917,7 +6101,7 @@ function SettingsView({
       <div className="settings-section">
         <h3 className="settings-section-title">当前游戏：{activeGameName}</h3>
         <div className="persist-card">
-          <div className="persist-row download-dir-row">
+          {activeGameId !== "neverness" && <div className="persist-row download-dir-row">
             <span className="download-dir-label">
               Mods 文件夹：
               <strong className="download-dir-path" title={activeModsPath}>
@@ -5927,8 +6111,8 @@ function SettingsView({
             <button className="panel-btn" onClick={onChangeModsPath}>
               📁 更改文件夹
             </button>
-          </div>
-          <div className="persist-row download-dir-row">
+          </div>}
+          {activeGameId !== "neverness" && <div className="persist-row download-dir-row">
             <span className="download-dir-label">
               游戏程序路径：
               <strong className="download-dir-path" title={launchConfig?.game_path}>
@@ -5938,16 +6122,23 @@ function SettingsView({
             <button className="panel-btn" onClick={() => pickLaunchExe("game")}>
               📁 选择
             </button>
-          </div>
-          <p className="persist-desc">
+          </div>}
+          {activeGameId === "neverness" && <>
+            <div className="persist-row download-dir-row"><span className="download-dir-label">游戏根目录：<strong className="download-dir-path" title={pakRoot}>{pakRoot || "（尚未设置）"}</strong></span><button className="panel-btn" onClick={async () => { const path = await open({ directory: true, multiple: false }); if (typeof path === "string") onPakRootChange(path); }}>📁 选择</button></div>
+            <div className="persist-row download-dir-row"><span className="download-dir-label">生效目录（自动推算）：<strong className="download-dir-path" title={pakActive}>{pakActive || "（请先选择游戏根目录）"}</strong></span></div>
+            <div className="persist-row download-dir-row"><span className="download-dir-label">停用目录：<strong className="download-dir-path" title={pakDisabled}>{pakDisabled || "（尚未设置）"}</strong></span><button className="panel-btn" onClick={async () => { const path = await open({ directory: true, multiple: false }); if (typeof path === "string") onPakDisabledChange(path); }}>📁 选择</button></div>
+            <p className="persist-desc">请选择包含名称带 Launcher 的 exe 文件的游戏根目录，生效目录按 Client\WindowsNoEditor\HT\Content\Paks\MOD 推算；请选择与之互不包含的现有停用目录。缺少生效目录时不会自动创建。原有启动程序配置保留，根目录设置暂不改变启动方式。</p>
+            {pakPathError && <p role="alert">{pakPathError}</p>}
+          </>}
+          {activeGameId !== "neverness" && <p className="persist-desc">
             以上两项<strong>跟随当前游戏切换</strong>，换游戏后会自动显示对应游戏的配置。
             Mods 文件夹请选择该游戏目录下的 <strong>Mods</strong> 文件夹，例如{" "}
             <code>XXMI MODS\EndField Game\Mods</code>；游戏程序路径留空时会自动从 XXMI Launcher 配置推断。
-          </p>
+          </p>}
         </div>
       </div>
 
-      <div className="settings-section">
+      {activeGameId !== "neverness" && <div className="settings-section">
         <h3 className="settings-section-title">启动设置：{activeGameName}</h3>
         <div className="persist-card">
           {(launchConfig?.supported_modes ?? []).includes("GIML") && (
@@ -5986,9 +6177,20 @@ function SettingsView({
             文件夹里查找。模式在左侧栏底部切换。
           </p>
         </div>
-      </div>
+      </div>}
 
-      <div className="settings-section">
+      {activeGameId === "neverness" ? <div className="settings-section">
+        <h3 className="settings-section-title">Aurora Launcher</h3>
+        <div className="persist-card">
+          <div className="persist-row download-dir-row">
+            <span className="download-dir-label">Aurora Launcher 路径：<strong className="download-dir-path" title={auroraPath}>{auroraPath || "（尚未设置）"}</strong></span>
+            <button className="panel-btn" onClick={() => void chooseAuroraLauncher()}>📁 选择</button>
+          </div>
+          <p className="persist-desc">该路径单独保存，仅用于异环，不影响其他游戏的 XXMI 设置；左侧按钮用于启动 Aurora，游戏由 Aurora 启动。</p>
+          <p className="persist-desc"><a className="aurora-download-link" href="https://gamebanana.com/tools/22803" onClick={(event) => { event.preventDefault(); void openUrl("https://gamebanana.com/tools/22803").catch((error) => setAuroraError(`打开下载页面失败：${String(error)}`)); }}>下载 Aurora Launcher</a></p>
+          {auroraError && <p role="alert">{auroraError}</p>}
+        </div>
+      </div> : <div className="settings-section">
         <h3 className="settings-section-title">XXMI Launcher（全局）</h3>
         <div className="persist-card">
           <div className="persist-row download-dir-row">
@@ -6007,7 +6209,7 @@ function SettingsView({
             留空时会自动从 XXMI Launcher 的默认安装位置推断。
           </p>
         </div>
-      </div>
+      </div>}
 
       <div className="settings-section">
         <h3 className="settings-section-title">下载</h3>
@@ -6196,6 +6398,287 @@ function OverlayHotkeyCard() {
       </div>
     </div>
   );
+}
+
+type PakEntry = { character: string; name: string; enabled: boolean; groups: number; error: string | null; conflict: boolean; modified: number; cover: string };
+
+function NevernessCharactersView({ skinsCatalog, cardSize, active, disabled, pathError, onSettings, dropped, onDropHandled, updateKeys, checkingUpdates, onCheckUpdates }: { skinsCatalog: Record<string, { characters: any[] }>; cardSize: number; active: string; disabled: string; pathError: string; onSettings: () => void; dropped: string[]; onDropHandled: () => void; updateKeys: string[]; checkingUpdates: boolean; onCheckUpdates: (force?: boolean) => void }) {
+  const [entries, setEntries] = useState<PakEntry[]>([]);
+  const [selected, setSelected] = useState("");
+  const [importSource, setImportSource] = useState("");
+  const [importList, setImportList] = useState<ImportCandidate[]>([]);
+  async function prepareImports(paths: string[], defaultCharacter: string) {
+    const items = await Promise.all(paths.map(async (path): Promise<ImportCandidate> => {
+      const name = (path.split(/[\\/]/).filter(Boolean).pop() || "").replace(/\.(zip|7z|rar)$/i, "");
+      let character = defaultCharacter;
+      if (!character) {
+        try { character = await invoke<string>("pak_guess_character", { stem: name }) || ""; }
+        catch { character = ""; }
+      }
+      return { path, name, character, size: 0 };
+    }));
+    setImportList(items);
+    setImportSource(paths[0]);
+  }
+  useEffect(() => {
+    if (!dropped.length) return;
+    void prepareImports(dropped, selected);
+    onDropHandled();
+  }, [dropped]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [modSearch, setModSearch] = useState("");
+  const [selectedMod, setSelectedMod] = useState("");
+  const [deletingPak, setDeletingPak] = useState<PakEntry | null>(null);
+  const [pakNotes, setPakNotes] = useState<Record<string, string>>({});
+  const [editingPakNote, setEditingPakNote] = useState(false);
+  const [pakNoteDraft, setPakNoteDraft] = useState("");
+  const [pakCoverBust, setPakCoverBust] = useState(0);
+  const [pakViewMode, setPakViewMode] = useState<"list" | "gallery">(() => localStorage.getItem("qaqm.viewMode") === "gallery" ? "gallery" : "list");
+  const [pakSort, setPakSort] = useState<"name" | "status" | "time" | "custom">("name");
+  const [pakSections, setPakSections] = useState<CharacterSection[]>([]);
+  const [pakAssignments, setPakAssignments] = useState<Record<string, string>>({});
+  const [pakSection, setPakSection] = useState("base");
+  const [addingPakSection, setAddingPakSection] = useState(false);
+  const [newPakSection, setNewPakSection] = useState("");
+  const [pakOrder, setPakOrder] = useState<string[]>([]);
+  useEffect(() => {
+    if (!selected) return;
+    let alive = true;
+    setPakSection("base"); setSelectedMod("");
+    Promise.all([invoke<CharacterSection[]>("list_sections", { character: selected }), invoke<Record<string, string>>("get_mod_sections"), invoke<Record<string, string>>("get_mod_notes")]).then(([sections, assignments, notes]) => { if (alive) { setPakSections(sections); setPakAssignments(assignments); setPakNotes(notes); } }).catch((e) => { if (alive) setError(String(e)); });
+    try { const stored = JSON.parse(localStorage.getItem(`emm.pak.order.${selected}`) || "[]"); setPakOrder(Array.isArray(stored) ? stored.filter((x): x is string => typeof x === "string") : []); } catch { setPakOrder([]); }
+    return () => { alive = false; };
+  }, [selected]);
+  const [extraCharacters, setExtraCharacters] = useState<string[]>(() => {
+    try { const value = JSON.parse(localStorage.getItem("emm.pak.characters") || "[]"); return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : []; } catch { return []; }
+  });
+  const [characterRenames, setCharacterRenames] = useState<Record<string, string>>({});
+  const [characterCovers, setCharacterCovers] = useState<Set<string>>(new Set());
+  const revision = useRef(0);
+
+  async function refresh(a = active, d = disabled) {
+    const version = ++revision.current;
+    if (!a || !d) { setEntries([]); return; }
+    try {
+      const [result, renames, covers] = await Promise.all([
+        invoke<PakEntry[]>("pak_scan", { active: a, disabled: d }),
+        invoke<Record<string, string>>("pak_character_renames"),
+        invoke<string[]>("pak_character_covers", { active: a, disabled: d }),
+      ]);
+      if (version === revision.current) { setEntries(result); setCharacterRenames(renames); setCharacterCovers(new Set(covers)); setError(""); }
+    } catch (e) {
+      if (version === revision.current) { setEntries([]); setError(String(e)); }
+    }
+  }
+  useEffect(() => { void refresh(); return () => { revision.current++; }; }, [active, disabled]);
+  async function toggle(entry: PakEntry) {
+    if (busy || entry.error || entry.conflict) return;
+    setBusy(true); setError("");
+    try {
+      await invoke("pak_toggle", { active, disabled, character: entry.character, name: entry.name, enable: !entry.enabled });
+      setSelectedMod(`${entry.name}/${!entry.enabled}`);
+      await refresh();
+    } catch (e) { setError(String(e)); await refresh(); setError(String(e)); }
+    finally { setBusy(false); }
+  }
+  async function savePakNote(entry: PakEntry) {
+    if (busy) return;
+    setBusy(true); setError("");
+    try {
+      await invoke("set_pak_mod_note", { active, disabled, character: entry.character, modName: entry.name, enabled: entry.enabled, note: pakNoteDraft });
+      setPakNotes((prev) => ({ ...prev, [`${entry.character}/${entry.name}`]: pakNoteDraft }));
+      setEditingPakNote(false);
+    } catch (e) { setError(`保存备注失败：${String(e)}`); }
+    finally { setBusy(false); }
+  }
+  async function deletePak() {
+    if (!deletingPak || busy) return;
+    const target = deletingPak;
+    setBusy(true); setError("");
+    try {
+      await invoke("pak_delete", { active, disabled, character: target.character, name: target.name, enabled: target.enabled });
+      setDeletingPak(null);
+      setSelectedMod("");
+      await refresh();
+    } catch (e) { setError(`移入回收站失败：${String(e)}`); }
+    finally { setBusy(false); }
+  }
+  async function chooseImport() {
+    try {
+      const source = await open({
+        multiple: true,
+        filters: [{ name: "PAK Mod（文件夹或压缩包）", extensions: ["zip", "7z", "rar"] }],
+      });
+      const picked = typeof source === "string" ? [source] : Array.isArray(source) ? source : [];
+      if (picked.length === 0) return;
+      await prepareImports(picked, selected);
+    } catch (e) { setError(String(e)); }
+  }
+  async function importFolder(list: { path: string; character: string; name: string }[]) {
+    const pending = list.filter((item) => item.character && item.name.trim());
+    if (busy || !active || !disabled || pending.length === 0) {
+      if (list.some((item) => !item.name.trim())) setError("Mod 名称不能为空");
+      if (list.some((item) => !item.character)) setError("请为每个 Mod 选择角色");
+      return;
+    }
+    setBusy(true); setError("");
+    const failures: string[] = [];
+    try {
+      for (const item of pending) {
+        try {
+          await invoke("pak_import", { active, disabled, source: item.path, character: item.character, name: item.name.trim() });
+        } catch (e) {
+          failures.push(`${item.name}：${String(e)}`);
+        }
+      }
+      if (failures.length > 0) setError(`部分导入失败：\n${failures.join("\n")}`);
+      setImportSource(""); setImportList([]);
+      await refresh();
+    } catch (e) { setError(String(e)); }
+    finally { setBusy(false); }
+  }
+  const names = Array.from(new Set([...(BUILTIN_COVERS.neverness || []), "赤子", ...extraCharacters, ...entries.map((e) => e.character)].map((name) => characterRenames[name] || name))).sort((a, b) => a.localeCompare(b, "zh-CN"));
+  const pakGroups: CharacterGroup[] = names.map((name) => {
+    const mods = entries.filter((entry) => entry.character === name).map((entry): ModEntry => ({ name: entry.name, character: name, folder_name: entry.name, enabled: entry.enabled, rel_path: `${name}/${entry.name}`, has_cover: false, cover: "", modified: 0, hashes: [] }));
+    return { name, mods, cover: characterCovers.has(name) ? "_cover.png" : "", enabled_count: mods.filter((mod) => mod.enabled).length, total_count: mods.length, pinyin: "", pinyin_initials: "" };
+  });
+  const officialPakSkins = findCharacterSkins(skinsCatalog, "neverness", selected);
+  const selectedEntries = entries.filter((e) => e.character === selected);
+  const visibleEntries = selectedEntries.filter((e) => (pakAssignments[`${selected}/${e.name}`] || "base") === pakSection && e.name.toLowerCase().includes(modSearch.trim().toLowerCase())).sort((a, b) => {
+    if (pakSort === "status") return Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name, "zh-CN");
+    if (pakSort === "time") return b.modified - a.modified || a.name.localeCompare(b.name, "zh-CN");
+    if (pakSort === "custom") { const rank = (name: string) => { const index = pakOrder.indexOf(name); return index < 0 ? pakOrder.length : index; }; return rank(a.name) - rank(b.name) || a.name.localeCompare(b.name, "zh-CN"); }
+    return a.name.localeCompare(b.name, "zh-CN");
+  });
+  const detailEntry = selectedEntries.find((e) => `${e.name}/${e.enabled}` === selectedMod);
+  useEffect(() => { setEditingPakNote(false); setPakNoteDraft(""); }, [selectedMod, selected]);
+  async function savePakCover(entry: PakEntry, blob: Blob) {
+    if (busy || entry.conflict) return;
+    if (blob.size > 20 * 1024 * 1024) { setError("图片不能超过 20 MiB"); return; }
+    setBusy(true); setError("");
+    try {
+      const bitmap = await createImageBitmap(blob);
+      let png: Blob;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = bitmap.width; canvas.height = bitmap.height;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("无法处理图片");
+        context.drawImage(bitmap, 0, 0);
+        png = await new Promise<Blob>((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error("图片转换失败")), "image/png"));
+      } finally { bitmap.close(); }
+      if (png.size > 20 * 1024 * 1024) throw new Error("转换后的图片超过 20 MiB");
+      await invoke("pak_save_cover", { active, disabled, character: entry.character, name: entry.name, enabled: entry.enabled, base64Data: arrayBufferToBase64(await png.arrayBuffer()) });
+      setPakCoverBust(Date.now());
+      await refresh();
+    } catch (e) { setError(`保存预览图失败：${String(e)}`); }
+    finally { setBusy(false); }
+  }
+  useEffect(() => {
+    function onPaste(event: ClipboardEvent) {
+      if (!detailEntry || editingPakNote) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable=true]")) return;
+      const image = Array.from(event.clipboardData?.items || []).find((item) => item.type.startsWith("image/"))?.getAsFile();
+      if (image) { event.preventDefault(); void savePakCover(detailEntry, image); }
+    }
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [detailEntry, busy, editingPakNote, active, disabled]);
+  if (selected) return <div className="detail-layout">
+    <div className="detail-main">
+      <div className="detail-header">
+        <button className="back-btn" onClick={() => { setSelected(""); setModSearch(""); }} title="返回角色一览">←</button>
+        <h2>{selected}</h2><span className="header-tag">原角色</span>
+        <div className="detail-header-right"><button className="gallery-btn" onClick={() => { const next = pakViewMode === "list" ? "gallery" : "list"; setPakViewMode(next); localStorage.setItem("qaqm.viewMode", next); }}>{pakViewMode === "list" ? "🖼 进入画廊" : "☰ 进入列表"}</button><button className="primary" onClick={() => void chooseImport()} disabled={busy || !active || !disabled}>＋ 导入 Mod</button></div>
+      </div>
+      <div className="sections-bar"><div className="sections-head"><span className="sections-title">外观分区</span><span className="sections-meta">{officialPakSkins.length} 款官方皮肤 · {1 + officialPakSkins.length + pakSections.length} 个分区</span><span className="sections-hint">切换仅筛选显示，不会自动启停</span></div><div className="sections-list">
+        {[{ id: "base", name: "原角色" }, ...pakSections].map((section) => { const members = selectedEntries.filter((entry) => (pakAssignments[`${selected}/${entry.name}`] || "base") === section.id); return <div key={section.id} className={`section-card ${pakSection === section.id ? "active" : ""}`} onClick={() => setPakSection(section.id)}><div className="section-cover">{section.id === "base" ? <Cover basePath="" character={selected} cover="" gameId="neverness" /> : <span className="section-cover-placeholder">＋</span>}</div><div className="section-info"><div className="section-name">{section.name}</div><div className="section-en">{section.id === "base" ? "Original" : "自定义"}</div><div className="section-stat">{members.filter((entry) => entry.enabled).length} 启用 · {members.length} Mod</div></div>{section.id !== "base" && <button className="section-del" title="删除分区，Mod 归回原角色" onClick={(e) => { e.stopPropagation(); void invoke("delete_section", { id: section.id }).then(() => { setPakSections((prev) => prev.filter((s) => s.id !== section.id)); setPakAssignments((prev) => Object.fromEntries(Object.entries(prev).filter(([, id]) => id !== section.id))); setPakSection("base"); }).catch((err) => setError(String(err))); }}>✕</button>}</div>; })}
+        {officialPakSkins.map((skin) => { const members = selectedEntries.filter((entry) => pakAssignments[`${selected}/${entry.name}`] === skin.sectionId); return <div key={skin.sectionId} className={`section-card ${pakSection === skin.sectionId ? "active" : ""}`} title={skin.nameEn || skin.nameZh} onClick={() => setPakSection(skin.sectionId)}><div className="section-cover">{skin.image ? <img src={skin.image} alt={skin.nameZh} className="cover-img" /> : <span className="section-cover-placeholder">皮</span>}</div><div className="section-info"><div className="section-name">{skin.nameZh}</div><div className="section-en">{skin.nameEn || "官方皮肤"}</div><div className="section-stat">{members.filter((entry) => entry.enabled).length} 启用 · {members.length} Mod</div></div></div>; })}
+        {addingPakSection ? <div className="section-card adding"><input autoFocus value={newPakSection} maxLength={20} placeholder="分区名称" onChange={(e) => setNewPakSection(e.target.value)} onBlur={() => setAddingPakSection(false)} onKeyDown={(e) => { if (e.key === "Escape") setAddingPakSection(false); if (e.key === "Enter" && newPakSection.trim()) { const name = newPakSection.trim(); void invoke<CharacterSection>("add_section", { character: selected, name }).then((section) => { setPakSections((prev) => [...prev, section]); setPakSection(section.id); setNewPakSection(""); setAddingPakSection(false); }).catch((err) => setError(String(err))); } }} /></div> : <button className="section-card add-section" onClick={() => { setNewPakSection(""); setAddingPakSection(true); }}><span>＋</span><span>新增分区</span><span className="add-sub">名称自定义</span></button>}
+      </div></div>
+      <div className="detail-toolbar">
+        <div className="search-box"><span className="search-icon">🔍</span><input value={modSearch} onChange={(e) => setModSearch(e.target.value)} placeholder="搜索 Mod 名称…" />{modSearch && <button className="search-clear" onClick={() => setModSearch("")}>✕</button>}</div>
+        <div className="sort-group"><span className="sort-label">排序</span>{([['name', '名称'], ['status', '状态'], ['time', '时间'], ['custom', '自定义']] as const).map(([key, label]) => <button key={key} className={`sort-chip ${pakSort === key ? 'active' : ''}`} onClick={() => setPakSort(key)}>{label}</button>)}</div>
+        <span className="mod-count-hint">{visibleEntries.length} / {selectedEntries.length}</span>
+      </div>
+      {error && !importSource && <p role="alert">{error}</p>}
+      <div className="detail-mod-list">
+        <div className={pakViewMode === "gallery" ? "gallery-grid" : undefined}>
+        {visibleEntries.map((entry) => {
+          const key = `${entry.name}/${entry.enabled}`;
+          const moveOrder = (delta: number) => { const all = [...pakOrder.filter((name) => selectedEntries.some((item) => item.name === name)), ...selectedEntries.map((item) => item.name).filter((name) => !pakOrder.includes(name))]; const index = all.indexOf(entry.name); const next = index + delta; if (index < 0 || next < 0 || next >= all.length) return; [all[index], all[next]] = [all[next], all[index]]; try { localStorage.setItem(`emm.pak.order.${selected}`, JSON.stringify(all)); setPakOrder(all); } catch (err) { setError(String(err)); } };
+          const toggleControl = <label className="switch" onClick={(e) => e.stopPropagation()} title={entry.conflict ? "同名冲突" : entry.error || "按目录位置启用或停用"}><input type="checkbox" checked={entry.enabled} disabled={busy || entry.conflict || !!entry.error} onChange={() => void toggle(entry)} /><span className="slider" /></label>;
+          return pakViewMode === "gallery" ? <div className={`gallery-card ${entry.enabled ? "enabled" : "disabled"} ${key === selectedMod ? "selected" : ""}`} key={key} onClick={() => setSelectedMod(key)}><div className="gallery-cover">{entry.cover ? <Cover key={`${key}-${pakCoverBust}`} basePath={entry.enabled ? active : disabled} character={entry.character} cover={`${entry.name}/${entry.cover}`} bust={pakCoverBust} /> : <span className="gallery-cover-placeholder">🖼️</span>}</div><div className="gallery-card-bar"><span className="gallery-card-name">{entry.name}</span>{toggleControl}</div></div> : <div className={`detail-mod-row ${entry.enabled ? "on" : "off"} ${key === selectedMod ? "active" : ""}`} key={key} onClick={() => setSelectedMod(key)}>{toggleControl}<div className="row-info"><div className="row-name">{entry.name}</div><div className="row-sub">{entry.conflict ? "同名冲突，请检查两个目录" : entry.error ? `异常：${entry.error}` : `${entry.enabled ? "生效目录" : "停用目录"} · ${entry.groups} 组 PAK 文件`}</div></div>{pakSort === "custom" && <span onClick={(e) => e.stopPropagation()}><button onClick={() => moveOrder(-1)} title="上移">↑</button><button onClick={() => moveOrder(1)} title="下移">↓</button></span>}<button className="row-delete" disabled={busy || entry.conflict} title={entry.conflict ? "请先处理同名冲突" : "删除此 Mod（移入回收站）"} onClick={(e) => { e.stopPropagation(); setError(""); setDeletingPak(entry); }}>✕</button></div>;
+        })}
+        </div>
+        {visibleEntries.length === 0 && <div className="empty-hint">{modSearch ? `没有匹配「${modSearch}」的 Mod` : "该角色下暂无 Mod"}</div>}
+        <div className="detail-drop-hint"><span className="drop-icon">📁</span><span>点击右上角「导入 Mod」或拖入已解压的 Mod 文件夹</span></div>
+      </div>
+    </div>
+    <div className="detail-panel">{detailEntry ? <><div className="detail-preview">{detailEntry.cover ? <Cover key={`${selectedMod}-${pakCoverBust}`} basePath={detailEntry.enabled ? active : disabled} character={detailEntry.character} cover={`${detailEntry.name}/${detailEntry.cover}`} bust={pakCoverBust} /> : <span className="preview-placeholder">选择图片 / Ctrl+V 粘贴设置预览图</span>}<div className="preview-overlay"><span>点击“选择图片”或 Ctrl+V 粘贴</span></div></div><div className="detail-title-row"><h3 className="detail-title">{detailEntry.name}</h3><label className="panel-btn">选择图片<input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => { const file = e.target.files?.[0]; if (file) void savePakCover(detailEntry, file); e.target.value = ""; }} /></label></div><div className="panel-box"><div className="panel-box-row"><div className="panel-box-head"><span className="panel-box-title">外观分区</span><span className="panel-box-hint">仅用于整理，不改变启用状态</span></div><select className="panel-select" value={pakAssignments[`${selected}/${detailEntry.name}`] || "base"} onChange={(e) => { const sectionId = e.target.value; const key = `${selected}/${detailEntry.name}`; void invoke("set_mod_section", { character: selected, modName: detailEntry.name, sectionId }).then(() => setPakAssignments((prev) => ({ ...prev, [key]: sectionId }))).catch((err) => setError(String(err))); }}><option value="base">原角色</option>{officialPakSkins.map((skin) => <option key={skin.sectionId} value={skin.sectionId}>{skin.nameZh}</option>)}{pakSections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}</select></div></div><div className="detail-status"><span className={`status-dot ${detailEntry.enabled ? "on" : "off"}`} />{detailEntry.enabled ? "生效目录" : "停用目录"}</div><div className="panel-box note-box"><div className="panel-box-row"><div className="panel-box-head"><span className="panel-box-title">📝 备注</span><button className="panel-link-btn" disabled={busy || detailEntry.conflict} onClick={() => { setPakNoteDraft(pakNotes[`${selected}/${detailEntry.name}`] || ""); setEditingPakNote(true); }}>{pakNotes[`${selected}/${detailEntry.name}`] ? "编辑" : "添加"}</button></div>{editingPakNote ? <div className="note-editor"><textarea className="note-textarea" autoFocus placeholder="点击添加备注..." value={pakNoteDraft} onChange={(e) => setPakNoteDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) void savePakNote(detailEntry); }} /><div className="note-editor-actions"><button className="panel-link-btn" disabled={busy} onClick={() => void savePakNote(detailEntry)}>保存</button><button className="panel-link-btn dim" disabled={busy} onClick={() => setEditingPakNote(false)}>取消</button></div></div> : <div className={`note-text ${pakNotes[`${selected}/${detailEntry.name}`] ? "" : "note-empty"}`} onClick={() => { if (!busy && !detailEntry.conflict) { setPakNoteDraft(pakNotes[`${selected}/${detailEntry.name}`] || ""); setEditingPakNote(true); } }}>{pakNotes[`${selected}/${detailEntry.name}`] || "点击添加备注..."}</div>}</div></div><button className="panel-btn" disabled={busy || detailEntry.conflict} onClick={() => { setError(""); void invoke("pak_open_folder", { active, disabled, character: detailEntry.character, name: detailEntry.name, enabled: detailEntry.enabled }).catch((err) => setError(`打开文件夹失败：${String(err)}`)); }}>📁 打开 Mod 文件夹</button><button className="panel-btn delete" disabled={busy || detailEntry.conflict} onClick={() => { setError(""); setDeletingPak(detailEntry); }}>🗑 删除</button></> : <div className="empty-hint">选择一个 Mod 查看详情</div>}</div>
+    {deletingPak && <div className="modal-overlay" onClick={() => { if (!busy) setDeletingPak(null); }}><div className="confirm-modal" onClick={(e) => e.stopPropagation()}><div className="confirm-icon">⚠️</div><h3 className="confirm-title">确认删除</h3><p className="confirm-text">将「{deletingPak.name}」整个文件夹移入回收站？</p><p className="confirm-text">位置：{deletingPak.enabled ? active : disabled}\\{deletingPak.character}\\{deletingPak.name}</p><p className="hint">包含文件夹内所有文件。回收站不可用或空间不足时操作可能失败；不会改为永久删除。</p>{error && <p role="alert">{error}</p>}<div className="confirm-actions"><button className="confirm-primary" disabled={busy} onClick={() => void deletePak()}>{busy ? "处理中…" : "移入回收站"}</button><button className="confirm-cancel" disabled={busy} onClick={() => setDeletingPak(null)}>取消</button></div></div></div>}
+    {importSource && <ImportDialog key={importSource} items={importList} characters={names} busy={busy} pakMode error={error} onCancel={() => { if (!busy) { setImportSource(""); setImportList([]); setError(""); } }} onConfirm={(list) => void importFolder(list)} />}
+  </div>;
+  return <><CharactersView groups={pakGroups} gameId="neverness" skinsCatalog={skinsCatalog} modsPath={active} selectedChar="" onSelect={setSelected} onRename={(oldName, newName) => { void (async () => {
+    if (names.some((name) => name.toLocaleLowerCase() === newName.toLocaleLowerCase())) { setError("角色名称已存在"); return; }
+    try {
+      await invoke("pak_rename_character", { active, disabled, oldName, newName });
+      const next = extraCharacters.map((name) => name === oldName ? newName : name);
+      localStorage.setItem("emm.pak.characters", JSON.stringify(next)); setExtraCharacters(next);
+      const oldOrder = localStorage.getItem(`emm.pak.order.${oldName}`);
+      if (oldOrder && !localStorage.getItem(`emm.pak.order.${newName}`)) localStorage.setItem(`emm.pak.order.${newName}`, oldOrder);
+      await refresh();
+    } catch (e) { setError(`角色重命名失败：${String(e)}`); }
+  })(); }} onAddCharacter={(name) => {
+    if (!name.trim() || names.some((existing) => existing.toLocaleLowerCase() === name.toLocaleLowerCase())) { setError("角色名称为空或已存在"); return; }
+    const next = [...extraCharacters, name.trim()];
+    try { localStorage.setItem("emm.pak.characters", JSON.stringify(next)); setExtraCharacters(next); setError(""); } catch (e) { setError(`保存角色失败：${String(e)}`); }
+  }} onPickArchives={() => void chooseImport()} onOpenPack={() => {}} onRefreshAll={() => void refresh()} cardSize={cardSize} updateKeys={updateKeys} checkingUpdates={checkingUpdates} onCheckUpdates={onCheckUpdates} pakMode />
+  {(!active || !disabled || pathError) && <p className="hint">{pathError || "请先在系统设置中配置游戏根目录和停用目录。"} <button onClick={onSettings}>去系统设置</button></p>}
+  {error && !importSource && <p role="alert">{error}</p>}
+  {importSource && <ImportDialog key={importSource} items={importList} characters={names} busy={busy} pakMode error={error} onCancel={() => { if (!busy) { setImportSource(""); setImportList([]); setError(""); } }} onConfirm={(list) => void importFolder(list)} />}
+  </>;
+  /* 旧异环一览已由 CharactersView 替代。
+    <div className="char-header-panel">
+      <div className="char-header-top">
+        <div><h2>{selected ? `${selected} · Mod 管理` : "角色列表"}</h2>
+          <div className="subtitle">当前显示 {visible.length} / {names.length} 个角色，合计 {entries.length} 个 Mod</div>
+        </div>
+        <div className="char-header-actions">
+          {selected && <button className="panel-btn" onClick={() => setSelected("")}>返回角色一览</button>}
+          <button className="panel-btn" disabled={busy || !active || !disabled} onClick={() => void chooseImport()} title="导入已解压的 PAK Mod 文件夹">📦 导入文件夹</button>
+          <button className="panel-btn" disabled title="异环整合包导入尚未接入">🧩 整合包导入</button>
+          <button className="panel-btn repair" disabled title="开发中，敬请期待">🛠 修复 Mod</button>
+          <button className="panel-btn" disabled={busy || !active || !disabled} onClick={() => void refresh()}>刷新 / 整理</button>
+        </div>
+      </div>
+      {!selected && <div className="char-toolbar">
+        <div className="search-box char-search"><span className="search-icon">🔍</span><input placeholder="搜索角色名..." value={search} onChange={(e) => setSearch(e.target.value)} />{search && <button className="search-clear" onClick={() => setSearch("")}>✕</button>}</div>
+        <div className="filter-group"><span className="group-label">显示</span>{([["hasMods", "有内容"], ["all", "全部角色"], ["hasEnabled", "启用中"]] as const).map(([key, label]) => <button key={key} className={`sort-chip ${filter === key ? "active" : ""}`} onClick={() => { setFilter(key); localStorage.setItem("qaqm.characterFilter", key); }}>{label}</button>)}<button className="sort-chip" disabled title="异环更新检测尚未接入">有更新</button></div>
+        <div className="filter-group"><span className="group-label">排序</span>{([["recent", "常用"], ["mods", "Mod 数量"], ["name", "名称"]] as const).map(([key, label]) => <button key={key} className={`sort-chip ${sortBy === key ? "active" : ""}`} onClick={() => { setSortBy(key); localStorage.setItem("qaqm.characterSort", key); }}>{label}</button>)}<button className="sort-chip" disabled title="异环自定义排序尚未接入">自定义</button></div>
+      </div>}
+      {(!active || !disabled || pathError) && <p className="hint">{pathError || "请先在系统设置中配置游戏根目录和停用目录。"} <button onClick={onSettings}>去系统设置</button></p>}
+      {error && <p role="alert">{error}</p>}
+      {importSource && <ImportDialog key={importSource} items={importList} characters={names} busy={busy} pakMode error={error} onCancel={() => { if (!busy) { setImportSource(""); setImportList([]); setError(""); } }} onConfirm={(list) => void importFolder(list)} />}
+    </div>
+    {!selected ? <>
+      <div className="char-grid" style={{ "--card-w": `${cardSize}px` } as React.CSSProperties}>
+        <div className="char-card char-card-add" title="异环新增角色尚未接入" aria-disabled="true"><span className="add-char-plus">＋</span><span className="add-char-label">新增角色（暂不可用）</span></div>
+        {visible.map((name) => { const mods = entries.filter((e) => e.character === name); return <div className="char-card" key={name} onClick={() => setSelected(name)}>
+          <div className="char-cover"><Cover basePath="" character={name} cover="" gameId="neverness" /><span className="cover-badge mod">{mods.filter((m) => m.enabled).length}/{mods.length}</span></div>
+          <div className="char-card-name"><span className="name-text">{name}</span></div>
+        </div>; })}
+      </div>
+    </> : <div className="panel-box">
+      {selectedEntries.length === 0 && <p className="hint">此角色暂无 Mod，可选择导入已解压的 Mod 文件夹。</p>}
+      {selectedEntries.map((entry) => <div className="persist-row" key={`${entry.character}/${entry.name}/${entry.enabled}`}>
+        <span>{entry.name} · {entry.enabled ? "生效目录" : "停用目录"}{entry.conflict ? " · 同名冲突" : entry.error ? ` · 异常：${entry.error}` : ` · ${entry.groups} 组`}</span>
+        <button disabled={busy || entry.conflict || !!entry.error} onClick={() => void toggle(entry)}>{entry.enabled ? "停用" : "启用"}</button>
+      </div>)}
+    </div>}
+  </div>; */
 }
 
 // ===== 封面图组件（使用 asset 协议，避免 base64 撑爆 DOM） =====

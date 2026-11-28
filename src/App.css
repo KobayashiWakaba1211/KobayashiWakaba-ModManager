@@ -249,6 +249,9 @@ button:disabled { opacity: 0.5; cursor: default; }
   color: var(--text-dim);
   margin-bottom: 8px;
 }
+.launch-mode-label-centered {
+  text-align: center;
+}
 .launch-mode-buttons {
   display: flex;
   gap: 8px;
@@ -285,6 +288,8 @@ button:disabled { opacity: 0.5; cursor: default; }
   box-shadow: var(--accent-glow);
   transition: transform 0.12s, filter 0.12s;
   line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .launch-primary-btn:hover { filter: brightness(1.06); }
 .launch-primary-btn:active { transform: scale(0.97); }
@@ -2159,6 +2164,11 @@ body.char-dragging .char-card:hover { transform: none; }
 }
 
 .persist-desc { font-size: 13px; color: var(--text-dim); line-height: 1.7; margin-bottom: 14px; }
+.aurora-download-link { color: var(--text-dim); text-decoration: underline; text-underline-offset: 3px; }
+.aurora-download-link:hover { color: var(--text); }
+.neverness-intro-overlay { z-index: 2000; }
+.neverness-intro { max-width: 100%; max-height: 90vh; overflow-y: auto; }
+.neverness-intro .confirm-text { margin: 12px 0; text-align: left; }
 .persist-meta { font-size: 12px; color: var(--accent); margin-bottom: 16px; }
 
 /* 缓存保留数量滑块 */
